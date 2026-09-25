@@ -216,15 +216,28 @@ and worse category than producing no number:
   wrong between them. Fixed by scanning the first few rows for one that matches known column
   names better than the current header does, and promoting it if so.
 
-**One more was found, understood, and deliberately left unfixed.** A wholesaler's price list
-put a five-digit price in the right half of the page; the reader's two-column detection (built
-to split genuinely two-column pages, and already working correctly on other real lists with
-over a thousand lines) mistook that price for the start of a second column of product codes,
-purely because it happened to be a plain run of digits sitting past the page's midpoint. The
-page then got sliced in half through the middle of the price itself — `15713` became `15`.
-The honest fix touches the same column-splitting logic that several other real lists already
-depend on working correctly, and verifying it wouldn't quietly break one of those needs more
-time than this batch had. Documented here instead of patched in a hurry.
+**One more was found, understood, and deliberately left unfixed — for one session.** A
+wholesaler's price list put a five-digit price in the right half of the page; the two-column
+detector mistook that price for the start of a second column of product codes, purely because
+it happened to be a plain run of digits sitting past the page's midpoint. The page then got
+sliced in half through the middle of the price itself — `15713` became `15`. Fixed properly in
+Phase 9 once there was room to verify it against every real list this batch turned up, rather
+than patch it in a hurry and hope nothing else depended on the old behavior.
+
+## Phase 9 — Fixing Phase 8's flagged issue properly
+
+Came back to the one thing Phase 8 deliberately left alone, with the time to do it right this
+time: verify the fix against all sixteen real lists, not just the one that was broken.
+
+The real distinguishing signal was never *where* a number sits on the page — it's *what comes
+after it*. A genuine second-column product code always has more text following it on the same
+line (a description, then that column's own price). A price at the end of a single-column
+line has nothing after it. Once the column detector started checking for that instead of just
+checking horizontal position, the false positive disappeared: the broken file went from 40
+articles at the wrong price to 1,504 at the right one, and — the part that actually mattered —
+every other file, including the 1,250-article list that genuinely does have two columns,
+came out byte-for-byte identical to before. Two synthetic tests lock in both halves of that:
+a real two-column layout still gets split, and a lone trailing price no longer fools it.
 
 ## Roadmap
 
@@ -235,6 +248,3 @@ time than this batch had. Documented here instead of patched in a hurry.
   average cost per product (the cost history needed for that is already being recorded).
 - Packaging the Windows launcher as a single `.exe` so a non-technical user never has to see
   Python at all.
-- Make the two-column PDF detection word-aware (it currently decides and cuts at the
-  character level) so a price that happens to sit past the page's midpoint can't be
-  mistaken for the start of a second column (Phase 8).
