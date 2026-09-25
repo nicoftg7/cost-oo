@@ -102,8 +102,9 @@ def precios_de(linea):
     for m in PRECIO.finditer(linea):
         if not TELEFONO.fullmatch(m.group(1) or m.group(2)):
             return a_numero(m.group(1) or m.group(2)), None, m.span()
-    # número suelto al final de línea, precedido de espacio o separador
-    m = re.search(rf"[\s:\-–=]\s*({NUM})\s*$", linea)
+    # número suelto al final de línea: precedido de espacio o separador, o directamente
+    # pegado al texto ("harina2000", sin espacio antes del precio)
+    m = re.search(rf"(?:[\s:\-–=]\s*|(?<=[a-zA-Záéíóúñ]))({NUM})\s*$", linea)
     if m and len(linea[:m.start()].strip()) > 2 and not TELEFONO.fullmatch(m.group(1)):
         return a_numero(m.group(1)), None, m.span()
     return None, None, None

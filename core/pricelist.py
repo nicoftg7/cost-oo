@@ -183,7 +183,7 @@ def _paginas_texto(pdf):
 
 
 # columnas de una tabla, reconocidas por su encabezado
-COL_CODIGO = re.compile(r"c[oó]d", re.I)
+COL_CODIGO = re.compile(r"c[oó]d|\bid\b", re.I)
 COL_DESC = re.compile(r"detalle|descrip|producto|art[ií]culo|nombre", re.I)
 COL_UNIDADES = re.compile(r"u\s*x\s*b|unid\w*\s*(x|por)\s*bulto|x\s*bulto", re.I)
 COL_PRECIO = re.compile(r"precio|costo|unitario|importe|valor|final|neto", re.I)

@@ -10,7 +10,7 @@ from core import ErrorDeDatos, sheets
 from core.catalog import construir
 from core.cycle import correr_fuentes
 from core.output import control
-from core.pricelist import renglones_de_texto
+from core.pricelist import _columnas, renglones_de_texto
 from core.verify import verificar
 
 from conftest import PRODUCTOS, export_df
@@ -174,6 +174,25 @@ def test_lista_vieja_avisa_y_reciente_no(catalogo, memoria):
                      fecha=dt.date.today() - dt.timedelta(days=5))
     res = correr_fuentes(catalogo, memoria, [reciente])
     assert "aviso_fecha" not in res["fuentes"][0]
+
+
+def test_columna_id_articulo_no_se_confunde_con_descripcion():
+    """'ID Artículo' contiene la palabra 'artículo', que también describe la columna de
+    descripción. Sin distinguirlas, la columna del código quedaba sin detectar y el número
+    de artículo se leía como si fuera el nombre del producto."""
+    cols = _columnas(["ID Artículo", "Descripción", "Marca", "Precio de Venta"])
+    assert cols["codigo"] == 0
+    assert cols["descripcion"] == 1
+
+
+def test_lista_de_un_proveedor_nuevo_sin_marca_en_el_texto_igual_pregunta(catalogo, memoria):
+    """Negocio recién armado: sin código aprendido y sin haberle comprado nunca nada a esta
+    distribuidora, la búsqueda de candidatos quedaba acotada a 'las marcas que ya se le
+    compran' -> ninguna -> no buscaba en nada. Debe buscar en todo el catálogo."""
+    f = lista("Distribuidora Cinco", "ZZ-0009 LAVANDINA CONCENTRADA 1 LITRO 900.00 20")
+    res = correr_fuentes(catalogo, memoria, [f])
+    assert res["fuera_de_catalogo"].empty
+    assert list(res["confirmar"].referencia) == ["LIM001"]
 
 
 # ---------- fuente habitual ----------

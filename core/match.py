@@ -358,8 +358,10 @@ def analizar_articulo(a, ctx, distribuidor, codigos, marcas_conocidas=(), unidad
         if len(aprendidas) == 1:
             fila, via, score = aprendidas[0], "alias aprendido", 100
         else:
-            marcas = (marca,) if marca else tuple(marcas_conocidas)
-            cands = _candidatos_cacheados(ctx, base["descripcion"], marcas) if marcas else []
+            # sin marca detectada y sin historial con esta distribuidora (proveedor nuevo,
+            # o su primera lista): buscar en todo el catálogo en vez de en nada
+            marcas = (marca,) if marca else tuple(marcas_conocidas) or ("",)
+            cands = _candidatos_cacheados(ctx, base["descripcion"], marcas)
             if not cands or cands[0][1] < UMBRAL_LISTA:
                 return [{**base, "estado": "fuera de catálogo", "score": round(cands[0][1]) if cands else 0,
                          "via": "no se parece a nada del catálogo"}]

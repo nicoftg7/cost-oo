@@ -191,3 +191,12 @@ def test_ignorado_acotado_al_proveedor(ciclo, memoria):
     memoria.aprender_ignorar("Comino 25 g", "Otro Proveedor", "no lo vendemos")
     res = ciclo("Especias Luna\nComino 25 g $700")
     assert res["analisis"].iloc[0]["estado"] != "ignorado"
+
+
+def test_precio_pegado_al_producto_sin_espacio(ciclo):
+    """'harina2000' sin espacio antes del precio no se leía como precio: la línea quedaba
+    como una variante sin precio, colgada del producto anterior ('aceite 2500')."""
+    res = ciclo("hola\naceite 2500\nharina2000")
+    filas = res["analisis"]
+    assert len(filas) == 2
+    assert dict(zip(filas["descripcion"], filas["costo_nuevo"])) == {"aceite": 2500.0, "harina": 2000.0}
