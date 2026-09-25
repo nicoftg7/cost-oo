@@ -196,6 +196,36 @@ rows fall back to name matching, rather than risking a wrong assignment), and a 
 from a first-ever distributor relationship (fixed in Phase 6; confirmed still solid here
 against an unrelated catalog).
 
+## Phase 8 — Real distributor lists, still no real business attached
+
+A batch of real price lists from real distributors (kept out of the repo — this is exactly
+the sensitive data Phase 6 removed) went through the reader with no real business's catalog
+behind them, purely to see how the parser itself holds up. Nothing crashed across sixteen
+files of wildly different layouts, but two produced a wrong number, which is a different
+and worse category than producing no number:
+
+- **A price got read as the wrong number entirely on a distributor list with no real table
+  columns** (the whole row lands in a single cell, e.g. `"3 TAPAS P/EMP. FREIR x 12 un.
+  $723,00"`). The cell-price reader took the *first* number it found — `12`, from the pack
+  quantity — instead of the actual price. It now prefers a number with a `$` in front of it,
+  falling back to the first bare number only when nothing has one.
+- **A price came out as a product's own internal ID.** A title row ("OBSERVACIONES:") sitting
+  above the real header made the spreadsheet library treat *that* row as the column names,
+  which pushed the real header ("ID Artículo", "Descripción", "Precio...") down into the
+  first row of data. Both the ID and the price are numeric, and column detection guessed
+  wrong between them. Fixed by scanning the first few rows for one that matches known column
+  names better than the current header does, and promoting it if so.
+
+**One more was found, understood, and deliberately left unfixed.** A wholesaler's price list
+put a five-digit price in the right half of the page; the reader's two-column detection (built
+to split genuinely two-column pages, and already working correctly on other real lists with
+over a thousand lines) mistook that price for the start of a second column of product codes,
+purely because it happened to be a plain run of digits sitting past the page's midpoint. The
+page then got sliced in half through the middle of the price itself — `15713` became `15`.
+The honest fix touches the same column-splitting logic that several other real lists already
+depend on working correctly, and verifying it wouldn't quietly break one of those needs more
+time than this batch had. Documented here instead of patched in a hurry.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the
@@ -205,3 +235,6 @@ against an unrelated catalog).
   average cost per product (the cost history needed for that is already being recorded).
 - Packaging the Windows launcher as a single `.exe` so a non-technical user never has to see
   Python at all.
+- Make the two-column PDF detection word-aware (it currently decides and cuts at the
+  character level) so a price that happens to sit past the page's midpoint can't be
+  mistaken for the start of a second column (Phase 8).
