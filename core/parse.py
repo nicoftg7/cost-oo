@@ -454,6 +454,11 @@ def extraer_renglones(bloques):
                 filas.append({"proveedor": prov_fila, "proveedor_bloque": proveedor,
                               "descripcion": IGUAL.sub("", texto).strip(" .,:;-–()"),
                               "linea": texto, "tipo": "sin cambio"})
+            elif re.search(r"\d", texto) and not INFORMATIVO.match(texto):
+                # tiene números (probablemente un intento de precio) pero no matcheó ningún
+                # caso conocido: se avisa en vez de perderla en silencio
+                notas.append({"proveedor": prov_fila or "(sin identificar)",
+                              "nota": "no encontré un precio en esta línea", "linea": texto})
 
     # un encabezado con variantes no es un producto en sí mismo
     con_variantes = {f["linea"].split("  →  ")[0] for f in filas if "  →  " in f.get("linea", "")}

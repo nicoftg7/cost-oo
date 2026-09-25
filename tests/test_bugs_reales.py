@@ -193,6 +193,16 @@ def test_ignorado_acotado_al_proveedor(ciclo, memoria):
     assert res["analisis"].iloc[0]["estado"] != "ignorado"
 
 
+def test_linea_con_numeros_pero_sin_precio_reconocible_avisa(ciclo):
+    """Una línea con separadores raros ('chia•250g•2000') no matcheaba ningún caso conocido
+    y desaparecía sin dejar rastro: ni renglón, ni aviso. Ahora, si tiene números y no es
+    puro texto informativo, se avisa en vez de perderse en silencio."""
+    res = ciclo("Especias Luna\nsemillas de chia•250g•2000")
+    assert res["analisis"].empty
+    assert len(res["notas"]) == 1
+    assert "no encontré" in res["notas"].iloc[0]["nota"]
+
+
 def test_precio_pegado_al_producto_sin_espacio(ciclo):
     """'harina2000' sin espacio antes del precio no se leía como precio: la línea quedaba
     como una variante sin precio, colgada del producto anterior ('aceite 2500')."""
