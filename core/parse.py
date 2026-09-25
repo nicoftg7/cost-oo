@@ -39,7 +39,7 @@ VINETA = re.compile(r"^\s*[\*\-–—•·>]+\s*")
 BULTO = re.compile(r"\(?\s*\d{0,4}\s*(?:u\s*x\s*b|ux b|unidades? por bulto)\s*\)?", re.I)
 # "si ponen stock, no le des importancia"
 STOCK = re.compile(r"\b(sin\s+l[ií]m[ií]te\s+de\s+stock|sin\s+limte\s+de\s+stock|"
-                   r"con\s+stock|hay\s+stock|stock\s+(disponible|permanente))\b", re.I)
+                   r"(?<!no\s)(?:con|hay)\s+stock|stock\s+(disponible|permanente))\b", re.I)
 # marcadores de sección: cortan la herencia del encabezado con precio
 SECCION = re.compile(r"^\s*(novedad|nuevo|nueva|atenci[oó]n|importante|oferta|promo)\b", re.I)
 # aclaraciones al final de una lista, no son productos
@@ -406,12 +406,14 @@ def extraer_renglones(bloques):
                 pendiente = titulo = None
                 continue
 
-            # b) título: sin precio, y abajo vienen renglones que solo dicen tamaño y precio
+            # b) título: sin precio, y abajo vienen renglones que solo dicen tamaño y precio,
+            #    o directamente avisan que no hay stock de eso
             #    "Miel en envases de plástico."  /  "x250cm3 $3200"  /  "x360cm3 $4500"
+            #    "Gaseosa Cola 500cc"  /  "No hay stock por ahora"
             if costo is None and i + 1 < len(lineas) and not FALTA.search(texto) and not IGUAL.search(texto):
                 sig = lineas[i + 1][0]
                 c_sig, _, s_sig = precios_de(sig)
-                if c_sig is not None and solo_presentacion(limpiar_desc(sig, s_sig)):
+                if (c_sig is not None and solo_presentacion(limpiar_desc(sig, s_sig))) or FALTA.search(sig):
                     titulo = base_desc
                     pendiente = None
                     continue
@@ -444,10 +446,14 @@ def extraer_renglones(bloques):
             pendiente = None
             m = SIN_PRODUCTO.match(texto)
             if (FALTA.search(texto) and not VUELVE.search(texto)) or m:
-                desc = m.group(1) if m else RELLENO.sub(" ", FALTA.sub(" ", texto))
+                desc = (m.group(1) if m else RELLENO.sub(" ", FALTA.sub(" ", texto))).strip(" .,:;-–")
+                desc = re.sub(r"\s*\bstock\b\s*", " ", desc, flags=re.I).strip()
+                if len(desc) < 3 and titulo:   # "no hay stock" solo: el producto venía en el título de arriba
+                    desc = titulo
+                titulo = None
                 mes = re.search(MESES, texto, re.I)
                 filas.append({"proveedor": prov_fila, "proveedor_bloque": proveedor,
-                              "descripcion": desc.strip(" .,:;-–"),
+                              "descripcion": desc,
                               "linea": texto, "tipo": "faltante",
                               "mes": mes.group(0).lower() if mes else ""})
             elif IGUAL.search(texto):

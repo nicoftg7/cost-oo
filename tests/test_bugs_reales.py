@@ -173,6 +173,17 @@ def test_faltante_se_avisa_no_se_despublica(ciclo):
     assert res["listos"].empty
 
 
+def test_no_hay_stock_no_se_confunde_con_hay_stock(ciclo):
+    """'no hay stock' contiene la frase 'hay stock' (que se descarta como ruido positivo:
+    "STOCK DISPONIBLE"), así que quedaba leída como 'no', perdiendo el aviso de faltante.
+    Debe reconocerse la negación tanto en una línea como en dos."""
+    res = ciclo("Pastas Río\nFideos naturales 500 g no hay stock")
+    assert res["avisos"].iloc[0]["descripcion"] == "Fideos naturales 500 g"
+
+    res2 = ciclo("Pastas Río\nFideos naturales 500 g\nNo hay stock por ahora")
+    assert res2["avisos"].iloc[0]["descripcion"] == "Fideos naturales 500 g"
+
+
 def test_variacion_fuerte_va_a_confirmar(ciclo):
     res = ciclo("Pastas Río\nFideos naturales 500 g $9000")
     assert res["listos"].empty
