@@ -176,6 +176,33 @@ def test_lista_vieja_avisa_y_reciente_no(catalogo, memoria):
     assert "aviso_fecha" not in res["fuentes"][0]
 
 
+def test_precio_de_celda_prefiere_el_numero_con_signo_peso():
+    """Una tabla sin columnas reales (todo el renglón cae en una sola celda) puede tener
+    más de un número antes del precio, como una cantidad ('x 12 un.'). El primer número
+    suelto no es el precio; el que tiene "$" adelante, sí."""
+    from core.pricelist import precio_de_celda
+    assert precio_de_celda("3 TAPAS P/EMP. FREIR x 12 un. $723,00") == "723,00"
+    assert precio_de_celda("$1 23.870,97") == "123.870,97"           # sigue andando sin "x N" de por medio
+
+
+def test_encabezado_real_corrido_por_una_fila_basura_arriba(tmp_path):
+    """Una fila de título ("OBSERVACIONES:") antes del encabezado real hace que pandas la
+    tome a ella como los nombres de columna, y el encabezado real queda como el primer dato:
+    el precio terminaba siendo el código del producto."""
+    import pandas as pd
+    df = pd.DataFrame([
+        ["OBSERVACIONES:", None, None],
+        ["Codigo", "Descripcion", "Precio"],
+        ["80018", "Aceite Zanoni 900cc", "2423.55"],
+        ["80047", "Aceto Balsamico 250cc", "973.7"],
+    ])
+    ruta = tmp_path / "lista.xlsx"
+    df.to_excel(ruta, index=False, header=False)
+    filas, _ = leer_tabla("lista.xlsx", ruta.read_bytes())
+    assert [f["codigo"] for f in filas] == ["80018", "80047"]
+    assert [f["precio"] for f in filas] == [2423.55, 973.7]
+
+
 def test_csv_sin_fila_de_encabezado_no_pierde_el_primer_articulo():
     """Sin una fila de títulos, pandas toma el primer artículo como si fuera el encabezado
     de las columnas y lo pierde (además de dejar sin código a los que quedan, porque las

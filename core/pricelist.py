@@ -128,9 +128,12 @@ def unir_digitos_partidos(t):
 
 
 def precio_de_celda(t):
-    """'$1 23.870,97' o '$ 1 .548,39' (el PDF metió espacios) -> '123.870,97' / '1.548,39'."""
+    """'$1 23.870,97' o '$ 1 .548,39' (el PDF metió espacios) -> '123.870,97' / '1.548,39'.
+    Si la celda tiene más de un número (p. ej. "x 12 un. $723,00", una tabla sin columnas
+    reales donde toda la fila cayó en una sola celda), el que tiene "$" adelante es el
+    precio; un número suelto sin "$" solo se usa si no hay ningún otro."""
     t = str(t or "").replace("\n", " ")
-    m = re.search(r"\$?\s*([\d][\d\s.,]*\d)", t)
+    m = re.search(r"\$\s*([\d][\d\s.,]*\d)", t) or re.search(r"([\d][\d\s.,]*\d)", t)
     return re.sub(r"\s+", "", m.group(1)) if m else ""
 
 
@@ -416,6 +419,14 @@ def detectar_columnas(df):
     return elegidas
 
 
+def _campos_por_nombre(etiquetas):
+    """Cuántos de código/descripción/precio matchean por el nombre de la columna (sin el
+    respaldo numérico de detectar_columnas)."""
+    normal = [sin_acentos(str(c)).lower().strip() for c in etiquetas]
+    return sum(any(any(n == p or n.startswith(p) for p in pistas) for n in normal)
+              for campo, pistas in PISTAS.items() if campo != "marca")
+
+
 def leer_tabla(nombre, contenido, idx=None):
     try:
         if contenido[:2] == b"PK" or nombre.lower().endswith((".xlsx", ".xls")):   # xlsx es un zip
@@ -425,6 +436,18 @@ def leer_tabla(nombre, contenido, idx=None):
     except Exception as e:
         raise ErrorDeDatos(f"No pude leer la lista {nombre} ({e}).")
     df = df.fillna("")
+    # el encabezado real puede haber quedado como una fila de datos más: una fila de
+    # título, de logo o de "OBSERVACIONES" arriba de todo hace que pandas tome esa (o una
+    # fila vacía) como los nombres de columna. Se busca entre las primeras filas la que
+    # más se parezca a un encabezado de verdad, y si hay una mejor que las columnas
+    # actuales, se la usa (descartando lo que haya arriba, que tampoco era un producto).
+    mejor_fila, mejor_score = None, _campos_por_nombre(df.columns)
+    for i in range(min(5, len(df))):
+        score = _campos_por_nombre(df.iloc[i])
+        if score > mejor_score:
+            mejor_fila, mejor_score = i, score
+    if mejor_fila is not None:
+        df = df.iloc[mejor_fila + 1:].set_axis(list(df.iloc[mejor_fila]), axis=1).reset_index(drop=True)
     cols = detectar_columnas(df)
     if "precio" in cols and not pd.isna(pd.to_numeric(pd.Series([cols["precio"]]), errors="coerce")[0]):
         # la columna de precio se llama "1550": no es un encabezado, es el primer artículo,
