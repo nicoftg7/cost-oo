@@ -101,7 +101,6 @@ def construir(fuente, quitar_repetidos=True, no_son_productos=()):
     c_pv = col("list_price", "precio de venta")
     c_web = col("website_id", "sitio web")
     c_cat = col("categ_id", "categoria del producto")
-    c_tipo = col("type", "tipo de producto")
     c_tag = col("product_tag_ids", "etiqueta")
     c_stk = col("qty_available", "cantidad a la mano")
     c_pub = col("is_published", "publicado")
@@ -125,8 +124,9 @@ def construir(fuente, quitar_repetidos=True, no_son_productos=()):
     if propios:
         empieza = df["nombre_completo"].map(lambda n: sin_acentos(n).lower().startswith(tuple(propios)))
         df = df[~empieza]
-    if c_tipo:
-        df = df[df[c_tipo].astype(str).str.strip().str.lower() != "servicio"]
+    # el tipo de producto de Odoo ("servicio" vs "almacenable") no se usa para filtrar acá:
+    # para un negocio que vende servicios, son sus productos. Lo que un negocio puntual no
+    # vende (una cuota social, un flete) se excluye por nombre en no_son_productos, arriba.
 
     partes = df["nombre_completo"].map(partir)
     df["producto"] = partes.map(lambda p: p[0])

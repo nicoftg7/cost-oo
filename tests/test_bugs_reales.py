@@ -158,6 +158,23 @@ def test_filas_que_no_son_productos_propias(memoria):
     assert list(construir(df, no_son_productos=["cuota social"]).referencia) == ["PAS001"]
 
 
+def test_negocio_de_servicios_no_pierde_sus_productos():
+    """El tipo de producto de Odoo ("servicio" vs "almacenable") no filtra nada: para un
+    negocio que vende servicios (una consultora, un SaaS), sus servicios SON el catálogo.
+    Antes, cualquier fila marcada "servicio" en Odoo se descartaba sin excepción, así que
+    el catálogo de un negocio así quedaba vacío."""
+    df = pd.DataFrame({
+        "id": ["__export__.product_template_0_ab12cd34", "__export__.product_template_1_ab12cd35"],
+        "name": ["Licencia Plan Pro mensual", "Consultoría técnica por hora"],
+        "default_code": ["LIC001", "CONS001"],
+        "standard_price": ["8000", "15000"],
+        "type": ["Servicio", "Servicio"],
+    })
+    cat = construir(df)
+    assert len(cat) == 2
+    assert set(cat.referencia) == {"LIC001", "CONS001"}
+
+
 # ---- redes de seguridad generales ----
 def test_import_sin_inventario_ni_publicacion(tmp_path, ciclo):
     res = ciclo("Pastas Río\nFideos naturales 500 g $3600")
