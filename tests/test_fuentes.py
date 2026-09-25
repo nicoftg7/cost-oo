@@ -10,7 +10,7 @@ from core import ErrorDeDatos, sheets
 from core.catalog import construir
 from core.cycle import correr_fuentes
 from core.output import control
-from core.pricelist import _columnas, renglones_de_texto
+from core.pricelist import _columnas, leer_tabla, renglones_de_texto
 from core.verify import verificar
 
 from conftest import PRODUCTOS, export_df
@@ -174,6 +174,17 @@ def test_lista_vieja_avisa_y_reciente_no(catalogo, memoria):
                      fecha=dt.date.today() - dt.timedelta(days=5))
     res = correr_fuentes(catalogo, memoria, [reciente])
     assert "aviso_fecha" not in res["fuentes"][0]
+
+
+def test_csv_sin_fila_de_encabezado_no_pierde_el_primer_articulo():
+    """Sin una fila de títulos, pandas toma el primer artículo como si fuera el encabezado
+    de las columnas y lo pierde (además de dejar sin código a los que quedan, porque las
+    columnas terminan llamándose como los datos de esa fila fantasma)."""
+    contenido = (b"FER001,Tornillo autoperforante 3x25,1550\n"
+                 b"FER002,Clavo de acero 2 pulgadas,2280\n")
+    filas, _ = leer_tabla("lista.csv", contenido)
+    assert len(filas) == 2
+    assert {f["descripcion"] for f in filas} == {"Tornillo autoperforante 3x25", "Clavo de acero 2 pulgadas"}
 
 
 def test_columna_id_articulo_no_se_confunde_con_descripcion():

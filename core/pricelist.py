@@ -426,6 +426,12 @@ def leer_tabla(nombre, contenido, idx=None):
         raise ErrorDeDatos(f"No pude leer la lista {nombre} ({e}).")
     df = df.fillna("")
     cols = detectar_columnas(df)
+    if "precio" in cols and not pd.isna(pd.to_numeric(pd.Series([cols["precio"]]), errors="coerce")[0]):
+        # la columna de precio se llama "1550": no es un encabezado, es el primer artículo,
+        # y pandas se lo comió como si fuera una fila de títulos. Se lo devuelve a los datos.
+        primera = pd.DataFrame([list(df.columns)], columns=range(len(df.columns)))
+        df = pd.concat([primera, df.set_axis(range(len(df.columns)), axis=1)], ignore_index=True).fillna("")
+        cols = detectar_columnas(df)
     if "precio" not in cols:
         raise ErrorDeDatos(f"En la lista {nombre} no encontré la columna de precio. "
                            f"Columnas: {', '.join(map(str, df.columns))}.")
