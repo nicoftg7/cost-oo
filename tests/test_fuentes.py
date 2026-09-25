@@ -308,8 +308,8 @@ def test_titulo_sin_precio_se_aplica_a_los_renglones_de_abajo():
     assert por_precio[3150.0] in ("Dulce de mandarina", "Dulce de naranja")
     assert por_precio[3200.0] == "Miel en envases de plástico x250cm3"
     assert por_precio[4500.0] == "Miel en envases de plástico x360cm3"
-    assert por_precio[5750.0] == "Miel en frascos de vidrio 360 cm3 (1/2 kilo"
-    assert por_precio[8300.0] == "Miel en frascos de vidrio 650 cm3 ( 1 kg"
+    assert por_precio[5750.0] == "Miel en frascos de vidrio 360 cm3 (1/2 kilo)"
+    assert por_precio[8300.0] == "Miel en frascos de vidrio 650 cm3 ( 1 kg )"
     # ni el teléfono ni "Consultar productos..." son productos
     assert all("3415550000" not in r["linea"] and "Consultar" not in r["linea"] for r in renglones)
     assert len(renglones) == 9

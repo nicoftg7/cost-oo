@@ -231,6 +231,31 @@ def test_linea_con_numeros_pero_sin_precio_reconocible_avisa(ciclo):
     assert "no encontré" in res["notas"].iloc[0]["nota"]
 
 
+def test_aclaracion_entre_parentesis_no_pierde_el_cierre(ciclo):
+    """'Licencia Plan Pro mensual (por usuario) 19800': al sacar el precio, limpiar_desc()
+    recortaba ')' como si fuera ruido de borde y la descripción quedaba con el paréntesis
+    abierto ('... (por usuario'). El negocio es de software, no de comercio: la aclaración
+    entre paréntesis es habitual (por usuario, por mes, equivale a N meses)."""
+    res = ciclo("CloudSoft\nLicencia Plan Pro mensual (por usuario) 19800")
+    r = res["analisis"].iloc[0]
+    assert r["descripcion"] == "Licencia Plan Pro mensual (por usuario)"
+    assert r["costo_nuevo"] == 19800.0
+
+
+def test_precio_en_dolares_no_se_confunde_con_pesos(ciclo):
+    """'u$s 45' no tiene una cotización acá adentro para convertir a pesos: tomar el 45
+    tal cual sería registrar un precio mil veces menor al real. Se avisa en vez de
+    inventar un costo."""
+    res = ciclo("CloudSoft\nLicencia Plan Enterprise mensual u$s 45")
+    assert res["analisis"].empty
+    assert len(res["notas"]) == 1
+    assert "dólares" in res["notas"].iloc[0]["nota"]
+
+    res2 = ciclo("CloudSoft\nSoporte tecnico premium mensual USD 12")
+    assert res2["analisis"].empty
+    assert "dólares" in res2["notas"].iloc[0]["nota"]
+
+
 def test_precio_pegado_al_producto_sin_espacio(ciclo):
     """'harina2000' sin espacio antes del precio no se leía como precio: la línea quedaba
     como una variante sin precio, colgada del producto anterior ('aceite 2500')."""

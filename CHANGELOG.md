@@ -239,6 +239,50 @@ every other file, including the 1,250-article list that genuinely does have two 
 came out byte-for-byte identical to before. Two synthetic tests lock in both halves of that:
 a real two-column layout still gets split, and a lone trailing price no longer fools it.
 
+## Phase 10 — Generalizing beyond stores that sell physical goods
+
+Every business used to test this app so far sold something you could put on a shelf. The
+next question was deliberate: does any of this quietly assume that, or does it actually hold
+for a business whose whole catalog is services — a software company, a consultancy, an
+accounting studio?
+
+- **A blanket filter silently emptied the catalog of any service business.** Odoo tags every
+  product with a `type` — stockable good, consumable, or service — and the catalog builder
+  dropped every row tagged "service" without exception. That rule made sense for the physical-
+  goods businesses this app was built against (a stray "service" row there is usually
+  shipping or a warranty add-on, not something to price), but for a business that *sells*
+  services, that's not noise — that's the entire catalog. A consultancy or a SaaS company
+  importing its Odoo export would have ended up with zero products and no indication why.
+  The fix removes the blanket rule: what a specific business doesn't actually sell (a
+  membership fee, a delivery charge) is still excluded, but by name, per business, the same
+  way a store already excludes its own non-product rows — never by Odoo's internal type field.
+
+- **Two message-parsing bugs surfaced only once services entered the picture, because their
+  triggers are much more common in that vocabulary than in a grocery list.** A parenthetical
+  clarification right before the price — "(por usuario)", "(4 personas)", "(equivale a 10
+  meses)" — is rare on a physical price list but constant in how software and coworking
+  pricing gets written out. The description cleanup step, when it stripped the price off the
+  end of a line, was also stripping a trailing `)` as if it were leftover punctuation, which
+  left the parenthetical open: "Licencia Plan Pro mensual (por usuario" instead of "...(por
+  usuario)". It now only trims genuine boundary noise and leaves a balanced parenthesis alone.
+
+- **A price quoted in dollars ("u$s 45", "USD 12") was being read as if it were pesos**,
+  because nothing in the price-matching regex distinguished a currency marker from ordinary
+  text — it just found "45" at the end of the line and took it as the cost. There's no
+  exchange rate anywhere in this app to convert that correctly (it's deliberately
+  peso-only, same as the tax rules in `core/pais.py`), and guessing would have been worse than
+  saying nothing: a dollar price read as pesos isn't off by a little, it's off by three
+  orders of magnitude. Rather than invent a conversion, a dollar-denominated line now surfaces
+  as an explicit warning — "no lo convierto solo, cargalo a mano" — instead of silently
+  recording a wrong number.
+
+Tested against seven fictional software/services businesses (SaaS licensing, an IT
+consultancy, a digital marketing agency, tech support, online courses, an accounting studio,
+a coworking space) and the full range of message styles a real one of these would send:
+per-user pricing, per-hour billing, multi-plan messages, annual-vs-monthly equivalences,
+typos, abbreviations, and emoji. Every catalog built correctly with its services intact, and
+after the two fixes above, no more mangled descriptions or mis-scaled prices turned up.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

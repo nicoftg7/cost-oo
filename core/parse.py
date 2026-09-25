@@ -69,6 +69,9 @@ PRECIO_DOBLE = re.compile(rf"\$?\s*({NUM})\s*\(\s*\$?\s*({NUM})\s*\)")
 PRECIO = re.compile(rf"(?<!\d)\$\s?({NUM})|(?<![\w,.$])({NUM})\s*(?:\.-|pesos)(?![\w%])")
 # un número de 8 cifras o más sin separadores es un teléfono o un CBU, no un precio
 TELEFONO = re.compile(r"\d{8,}")
+# precio en dólares (u$s, USD): no hay cotización acá adentro para convertirlo, y tomar
+# el número tal cual sería registrar un precio en pesos 1000 veces menor al real
+DOLAR = re.compile(r"\bu\$s\b|\bus\$|\busd\b", re.I)
 # líneas de contacto: "Pedidos: 3415550000", "WhatsApp 341...", "alias: ..."
 CONTACTO = re.compile(r"^\s*(pedidos?|tel[eé]fono|tel|cel(ular)?|whats?app|wsp|contacto|cbu|cvu|alias|"
                       r"e-?mail|mail|instagram|ig|facebook|direcci[oó]n|horarios?)\b\s*[:.]?", re.I)
@@ -96,6 +99,8 @@ def a_numero(t):
 
 def precios_de(linea):
     """Devuelve (costo, precio_sugerido, span) o (None, None, None)."""
+    if DOLAR.search(linea):
+        return None, None, None
     m = PRECIO_DOBLE.search(linea)
     if m:
         return a_numero(m.group(1)), a_numero(m.group(2)), m.span()
@@ -373,11 +378,18 @@ INFORMATIVO = re.compile(r"^\s*(consult\w*|ped\w+|avis\w*|hacemos|enviamos|entre
 
 
 def limpiar_desc(texto, span):
-    """La descripción de un renglón: sin el precio, sin artículos al principio ni conectores al final."""
-    d = (texto[:span[0]] + " " + texto[span[1]:]).strip(" .:-–=$()") if span else texto
+    """La descripción de un renglón: sin el precio, sin artículos al principio ni conectores al final.
+
+    No se recorta "(" ni ")" como si fueran ruido de borde: una aclaración entre
+    paréntesis ("Licencia Plan Pro mensual (por usuario) 19800") queda balanceada
+    después de sacar el precio, y recortar ")" a ciegas la dejaba abierta."""
+    d = (texto[:span[0]] + " " + texto[span[1]:]).strip(" .:-–=$") if span else texto
+    d = re.sub(r"\(\s*\)", "", d).strip()   # paréntesis que quedó vacío al sacar el precio de adentro
     d = re.sub(r"^\s*(las?|los?|el|la)\s+", "", d, flags=re.I)
     for _ in range(3):
         d = COLA.sub("", d).strip(" .,:;-–—=")
+    if d.count("(") > d.count(")"):
+        d += ")"
     return d
 
 
@@ -460,6 +472,10 @@ def extraer_renglones(bloques):
                 filas.append({"proveedor": prov_fila, "proveedor_bloque": proveedor,
                               "descripcion": IGUAL.sub("", texto).strip(" .,:;-–()"),
                               "linea": texto, "tipo": "sin cambio"})
+            elif DOLAR.search(texto):
+                notas.append({"proveedor": prov_fila or "(sin identificar)",
+                              "nota": "precio en dólares (u$s/USD): no lo convierto solo, "
+                                      "cargalo a mano", "linea": texto})
             elif re.search(r"\d", texto) and not INFORMATIVO.match(texto):
                 # tiene números (probablemente un intento de precio) pero no matcheó ningún
                 # caso conocido: se avisa en vez de perderla en silencio
