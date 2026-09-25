@@ -158,25 +158,41 @@ def fecha_de(texto):
 
 
 # ---------- PDF ----------
+# para detectar columnas solo cuentan códigos "de verdad" (AL-0014, 80018), no un
+# "500" que está adentro de una descripción, y tampoco un precio: un precio de 5 cifras
+# en la mitad derecha de una página de una sola columna se le parece mucho a un código
+COD_COLUMNA = re.compile(r"(?:[A-Za-z]{1,4}-\d{3,6}|\d{4,7})$")
+
+
+def _corte_de_columna(palabras, ancho):
+    """Si la página tiene una segunda columna de artículos, la posición x donde empieza (o
+    None si no). Un código real de columna tiene más texto a su derecha en el mismo
+    renglón (la descripción, después el precio); un precio al final de una línea de una
+    sola columna no tiene nada más después, así que no cuenta como candidato."""
+    from collections import Counter
+
+    def sigue_texto(w):
+        return any(abs(o["top"] - w["top"]) <= 2 and o["x0"] > w["x1"] + 2 for o in palabras)
+
+    xs = [w["x0"] for w in palabras if COD_COLUMNA.match(w["text"]) and sigue_texto(w)]
+    izq = [x for x in xs if x < ancho * 0.3]
+    der = [x for x in xs if x >= ancho * 0.3]
+    if not der:
+        return None
+    # una segunda columna existe si sus códigos arrancan todos a la misma altura horizontal
+    moda, _ = Counter(round(x) for x in der).most_common(1)[0]
+    alineados = [x for x in der if abs(x - moda) <= 3]
+    if len(izq) >= 3 and len(alineados) >= max(5, 0.3 * len(izq)):
+        return min(alineados) - 1.5
+    return None
+
+
 def _paginas_texto(pdf):
     """Texto de cada página. Si la página tiene dos columnas de artículos, las separa."""
-    from collections import Counter
-    # para detectar columnas solo cuentan códigos "de verdad" (AL-0014, 80018), no un
-    # "500" que está adentro de una descripción
-    cod = re.compile(r"(?:[A-Za-z]{1,4}-\d{3,6}|\d{4,7})$")
     textos = []
     for pg in pdf.pages:
-        palabras = pg.extract_words()
-        xs = [w["x0"] for w in palabras if cod.match(w["text"])]
-        izq = [x for x in xs if x < pg.width * 0.3]
-        der = [x for x in xs if x >= pg.width * 0.3]
-        # una segunda columna existe si sus códigos arrancan todos a la misma altura horizontal
-        alineados = []
-        if der:
-            moda, _ = Counter(round(x) for x in der).most_common(1)[0]
-            alineados = [x for x in der if abs(x - moda) <= 3]
-        if len(izq) >= 3 and len(alineados) >= max(5, 0.3 * len(izq)):
-            corte = min(alineados) - 1.5
+        corte = _corte_de_columna(pg.extract_words(), pg.width)
+        if corte is not None:
             a = pg.filter(lambda o: o.get("object_type") != "char" or o["x0"] < corte)
             b = pg.filter(lambda o: o.get("object_type") != "char" or o["x0"] >= corte)
             textos.append((a.extract_text() or "") + "\n" + (b.extract_text() or ""))

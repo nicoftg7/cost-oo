@@ -10,7 +10,7 @@ from core import ErrorDeDatos, sheets
 from core.catalog import construir
 from core.cycle import correr_fuentes
 from core.output import control
-from core.pricelist import _columnas, leer_tabla, renglones_de_texto
+from core.pricelist import _columnas, _corte_de_columna, leer_tabla, renglones_de_texto
 from core.verify import verificar
 
 from conftest import PRODUCTOS, export_df
@@ -212,6 +212,31 @@ def test_csv_sin_fila_de_encabezado_no_pierde_el_primer_articulo():
     filas, _ = leer_tabla("lista.csv", contenido)
     assert len(filas) == 2
     assert {f["descripcion"] for f in filas} == {"Tornillo autoperforante 3x25", "Clavo de acero 2 pulgadas"}
+
+
+def _palabra(texto, x0, top, ancho=45):
+    return {"text": texto, "x0": x0, "x1": x0 + ancho, "top": top}
+
+
+def test_dos_columnas_reales_se_detectan():
+    palabras = []
+    for i in range(5):
+        top = i * 15
+        palabras += [_palabra(f"AL-{i:04d}", 20, top), _palabra("Fideos", 75, top), _palabra("$1000", 130, top),
+                    _palabra(f"AL-{9000+i}", 400, top), _palabra("Aceite", 455, top), _palabra("$2000", 510, top)]
+    assert _corte_de_columna(palabras, 1000) == pytest.approx(398.5)
+
+
+def test_precio_de_5_cifras_al_final_de_renglon_no_se_confunde_con_segunda_columna():
+    """Un precio de 5 cifras cae, por casualidad, pasada la mitad de la página (como un
+    código real de una segunda columna lo haría) pero no tiene nada más a la derecha en su
+    misma línea: un código de columna sí tendría descripción y precio después."""
+    palabras = []
+    for i in range(6):
+        top = i * 15
+        palabras += [_palabra(f"AL-{i:04d}", 20, top), _palabra("Vino Malbec 750cc", 75, top, ancho=140),
+                    _palabra("15713", 410, top)]     # el precio, último de la línea: nada después
+    assert _corte_de_columna(palabras, 1000) is None
 
 
 def test_columna_id_articulo_no_se_confunde_con_descripcion():
