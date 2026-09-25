@@ -156,6 +156,46 @@ None of these were found by more testing on the same data — they needed a genu
 different catalog and a genuinely fresh distributor relationship to show up. Each got a
 regression test the same day.
 
+## Phase 7 — Stress-testing with businesses that don't exist
+
+Everything up to here was tested against real data from one real business. This round did
+the opposite on purpose: four small, fictional businesses (a hardware store, a kiosk, a
+health-food shop, a bakery-supplies store) with invented catalogs, invented WhatsApp-style
+messages full of typos, missing accents, glued-together words, and mixed capitalization, and
+distributor lists with deliberately broken formatting (no product code column, the same code
+reused for two different products, no header row at all, empty filler columns, inconsistent
+whitespace). None of it touches a real supplier or a real price.
+
+Nothing crashed — every malformed input produced either a sensible result or a clear,
+controlled error. But five real gaps surfaced:
+
+- **A line with no recognizable price used to vanish with no trace at all** — not as a
+  product, not as a warning, nothing. `"semillas de chia•250g•2000"` (an odd separator
+  instead of spaces) just disappeared. Now, a line with digits that doesn't match any known
+  pattern becomes a note instead of silently dropping — the same principle the rest of the
+  app already follows ("nothing gets lost quietly"), extended to a gap it didn't cover.
+- **A distributor list with no header row lost its first product entirely**, because pandas
+  always treats the first row as column names — so that row (a real product) became "column
+  labels" instead of data, and the products after it lost their codes too (the columns ended
+  up named after that row's own values, which don't look like "código" or "descripción" to
+  anything). Detected with a simple, reliable signal: a real header is never itself a valid
+  number, so if the column picked as "price" is literally named e.g. `"1550"`, that row gets
+  put back as data before reading it again.
+- **"no hay stock" — the single most common way to say something ran out — was being read as
+  if it meant the opposite.** A rule discards "hay stock" / "con stock" as noise (that phrase
+  by itself just means "there's stock," worth ignoring). It didn't account for a preceding
+  negation, so "no hay stock" lost exactly the two words that mattered, and the missing-item
+  warning silently vanished with it.
+- As a related fix, a product named on one line with the stock warning on the *next* line
+  (a common two-line WhatsApp habit) now carries the product's name into the warning, instead
+  of reporting a warning with no product attached.
+
+Two things were tested and found to already be handled correctly, and left alone: a
+distributor code reused for two genuinely different products (the code gets dropped and both
+rows fall back to name matching, rather than risking a wrong assignment), and a first list
+from a first-ever distributor relationship (fixed in Phase 6; confirmed still solid here
+against an unrelated catalog).
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the
