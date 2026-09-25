@@ -126,6 +126,36 @@ with a UI bolted on:
 Every screen also got a light pass of single, deliberate emoji at section headers and action
 buttons — a scanning aid for someone moving fast, not decoration.
 
+## Phase 6 — What a second business found in one afternoon
+
+Everything so far had been tested against one real business's data. Setting up a second,
+unrelated one — same distributor, completely different product catalog — broke three things
+in an afternoon that a year of using it on a single business never surfaced:
+
+- **A PDF whose own header column was called "ID Artículo".** The word "Artículo" also
+  matches the pattern used to recognize a *description* column, so that column got claimed
+  first — leaving the actual "Descripción" column unread and the article's numeric code
+  sitting where the product name should be. Every fuzzy match against it failed, silently:
+  there was no name left to compare. Column detection now checks for a code-like header
+  (including a bare "id") before it checks for a description-like one.
+- **A first list from a first supplier could never match anything, on purpose but wrong.**
+  Name-matching was scoped to "brands already bought from this distributor" — a deliberate
+  choice to avoid cross-brand false positives. For a business with history, that's a
+  reasonable narrowing. For a *brand-new* pairing of business and distributor, that set is
+  always empty, so the search space was empty too: not "no good match," but "no search at
+  all." It worked on the original business only because months of confirmed codes and
+  purchase history had already populated that scope. Now an empty scope falls back to
+  searching the whole catalog instead of nothing.
+- **A price typed with no space before it.** `"harina2000"` doesn't look like a price to a
+  parser that expects a space, a `$`, or the word `pesos` before the digits — so the line
+  was treated as a variant of the *previous* line, and `"aceite 2500"` / `"harina2000"` merged
+  into one entry priced at 2500. The fallback price pattern now also accepts a price glued
+  directly onto the end of a word.
+
+None of these were found by more testing on the same data — they needed a genuinely
+different catalog and a genuinely fresh distributor relationship to show up. Each got a
+regression test the same day.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the
