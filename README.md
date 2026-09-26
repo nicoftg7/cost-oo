@@ -1,5 +1,8 @@
 # Odoo cost updater
 
+[![tests](https://github.com/nicoftg7/costos-odoo/actions/workflows/tests.yml/badge.svg)](https://github.com/nicoftg7/costos-odoo/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 *Ships to end users as **Cost-oo**; this README covers the engine behind it.*
 
 **Your suppliers send prices over WhatsApp, and someone types them into Odoo by hand.**
