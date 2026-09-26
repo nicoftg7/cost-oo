@@ -77,6 +77,39 @@ actually a bulk-pack price in disguise.
 
 ![Review screen: totals, and a case where the app noticed a price looked like a 12-pack price, not a per-unit one](docs/img/revision-del-ciclo.png)
 
+## Why not just do it in Odoo?
+
+Fair question: Odoo has pieces of this. As of Odoo 19 (checked in September 2026):
+
+- **Vendor pricelist import** takes a CSV or Excel file in Odoo's own format and updates existing
+  lines when each row carries its external ID. That is the *last* step, and it needs a clean file.
+  This app is what turns a WhatsApp message into that clean file.
+- **Document digitization** (OCR + AI) reads *vendor bills* and expenses. It's an Enterprise
+  feature paid with in-app credits, and it isn't built for price lists or chat messages.
+- **The AI app** (agents, AI fields, AI server actions) gives general-purpose building blocks. Part
+  of this could be built with them, but it would be a configuration project of its own: it needs
+  Odoo 19, typically Enterprise, and AI credits or your own API key. And you'd still have to build
+  the memory and the review step.
+
+None of them does, out of the box, the part that takes the hours:
+
+- reading `budines 3520 galles 1000`;
+- knowing which product in *your* catalog each line is;
+- remembering how each supplier writes and each distributor's item codes;
+- noticing a bulk-pack price, a VAT-exclusive list or a changed pack size;
+- holding back what it isn't sure of until a person confirms it.
+
+**Why a local app instead of an Odoo module.**
+
+- **Any Odoo:** it only uses Odoo's export and import. So it works with Community or Enterprise,
+  any version, and Odoo Online, where custom modules can't be installed.
+- **Can't break Odoo:** it never asks for a password and never writes to Odoo. A person reviews
+  the file and imports it.
+- **No cost per use:** no AI credits are spent, and the business data stays on the computer.
+
+The trade-offs are real. Exporting and importing is a manual step, and it runs on one machine.
+The v2 adapter below addresses the first.
+
 ## Try it
 
 The repo ships a fictional store in [`ejemplo/`](ejemplo): an Odoo export, a sheet of supplier
@@ -180,6 +213,8 @@ one-off messages with the supplier picked by hand, and price lists in PDF, Excel
 ## Roadmap
 
 - **v2:** Odoo XML-RPC adapter to read the catalog and write costs directly (files stay the default).
+- Optionally write Odoo's vendor pricelist format (a price per product and supplier, with
+  dates) instead of the product cost, for businesses that track purchase prices that way.
 - **v3:** new-product creation, alerts against the historical average (the cost history is
   already being recorded).
 

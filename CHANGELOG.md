@@ -397,6 +397,27 @@ PDF, and a Word file that is just a pasted photo — common — goes through OCR
 it in a real browser also caught the review screen saying "0 items read" for a photo whose
 prices had been read fine (as a message); it now says how many prices it found and how.
 
+## Phase 15 — "Doesn't Odoo already do this?"
+
+Before announcing it, the obvious question came up: Odoo 19 ships AI features, so is this
+redundant? Checking what Odoo actually offers gave a precise answer.
+
+- **Vendor pricelist import:** exists, and needs a clean file in Odoo's format.
+- **Document digitization:** reads vendor bills, not price lists or chats.
+- **The new AI app:** gives building blocks to configure, not a finished workflow. It needs
+  Odoo 19, typically Enterprise, and credits or an API key.
+
+The part that takes the hours is turning messy supplier text into the right product in *this*
+catalog, and remembering it next month. None of Odoo's tools does that out of the box, and it
+is exactly what this app does. It then hands Odoo the clean file Odoo already knows how to import.
+
+The same check confirmed the architecture:
+- **A local app, not a module:** it works with every Odoo edition and version, including Odoo
+  Online, where custom modules can't be installed.
+- **No credentials, no per-use cost.**
+
+The comparison went into the README, so a reader gets the answer before they think to ask.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the
