@@ -93,6 +93,20 @@ def test_lista_primera_vez_pregunta_y_despues_entra_sola(catalogo, memoria):
     assert r["fuente"] == "Distribuidora Uno" and r["codigo"] == "AL-0100"
 
 
+def test_lista_con_la_misma_fila_repetida_no_se_duplica(catalogo, memoria):
+    """Una lista real con una página repetida (o mal cortada) puede traer el mismo artículo
+    dos veces, idéntico. Antes, las dos filas generaban la misma clave interna, y el cartel
+    de "dos renglones al mismo producto" terminaba señalándose a sí mismo: confirmar cuál vale
+    no hacía nada, porque agregar y sacar la misma clave de "salteados" se cancelaba solo."""
+    memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "PAS001")
+    f = lista("Distribuidora Uno",
+              "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3650.000 20",
+              "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3650.000 20")
+    res = correr_fuentes(catalogo, memoria, [f])
+    assert len(res["listos"]) == 1
+    assert res["confirmar"].empty
+
+
 def test_codigo_marcado_como_no_se_compra_se_ignora(catalogo, memoria):
     memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "")
     f = lista("Distribuidora Uno", "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3650.000 20")

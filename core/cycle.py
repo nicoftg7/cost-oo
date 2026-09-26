@@ -190,7 +190,17 @@ def correr_fuentes(catalogo, memoria, fuentes, aprobados_ciclo=(), saltados=(), 
                 renglones += r
                 notas += n
             else:
-                articulos = [dict(a) for a in lectura.articulos]
+                # una fila repetida tal cual (mismo código, descripción y precio) no aporta nada
+                # nuevo: una lista real con una página duplicada, o una tabla mal cortada, puede
+                # traer el mismo artículo dos veces. Sin este filtro, las dos filas caen en el
+                # mismo clave_renglon y el cartel de "dos renglones al mismo producto" termina
+                # apuntando a sí mismo: el botón de elegir cuál vale no hace nada.
+                vistas, articulos = set(), []
+                for a in lectura.articulos:
+                    clave = (a.get("codigo", ""), a.get("descripcion", ""), a.get("precio"))
+                    if clave not in vistas:
+                        vistas.add(clave)
+                        articulos.append(dict(a))
                 info["articulos"] = len(articulos)
                 for a in articulos:
                     # el precio anterior no se simula: representa lo que ya está en Odoo
