@@ -106,6 +106,18 @@ def catalogo(e):
     return _cache["catalogo"]
 
 
+def producto_por_nombre(cat, nombre):
+    """La referencia del producto con ese nombre, o "" si no está. El navegador no siempre
+    completa el valor exacto de la lista de sugerencias (mayúsculas, tildes, espacios de más
+    si se tipeó a mano): sin coincidencia exacta, se compara ignorando eso."""
+    if cat is None or not nombre:
+        return ""
+    hit = cat[cat.nombre_completo == nombre]
+    if not len(hit):
+        hit = cat[cat.nombre_completo.map(normalizar) == normalizar(nombre)]
+    return hit.iloc[0]["referencia"] if len(hit) else ""
+
+
 def cargar_fuentes(e):
     """Las fuentes del estado, con su contenido leído de disco."""
     salida = []
@@ -214,6 +226,9 @@ def tarjetas(res):
         if alerta == "otra fuente":
             explicacion = (f"Este producto se lo venís comprando a {r.get('fuente_habitual')}, "
                            f"y este precio es de {r.get('fuente')}.")
+        if tipo in ("aprobar", "fuente", "presentacion") and r.get("estado") == "revisar":
+            # la alerta del costo tapa que tampoco está seguro del producto: decirlo
+            explicacion = "No estoy seguro de que sea este producto. " + explicacion
         if alerta == "falta IVA":
             explicacion = "La lista viene sin IVA: falta saber qué IVA lleva este producto."
             perc = float(r.get("percepcion") or 0)
@@ -571,8 +586,12 @@ def revisar():
     igual = av[av.tipo.eq("sin cambio")] if len(av) else av
     rot = res["rotacion"]
     fuera = res["fuera_de_catalogo"]
+    no_encontrado = request.args.get("no_encontrado", "")
+    error = (f"No encontré “{no_encontrado}” en tu catálogo de Odoo, así que no se guardó nada. "
+             "Elegí el producto de las sugerencias que aparecen mientras escribís: así queda "
+             "el nombre exacto.") if no_encontrado else None
     return render_template(
-        "revisar.html", estado=e, cat=resumen(cat), fuentes=res["fuentes"],
+        "revisar.html", estado=e, cat=resumen(cat), fuentes=res["fuentes"], error=error,
         tarjetas=tarjetas(res),
         listos=res["listos"].to_dict("records"),
         sin_cambio=len(res["sin_cambio"]),
@@ -612,32 +631,39 @@ def decidir():
     distribuidor = r.get("proveedor_bloque", "")
     codigo = r.get("codigo", "")
 
+    def aprender(ref):
+        if es_lista and codigo:
+            memoria.aprender_codigo(distribuidor, codigo, texto, ref)
+        else:
+            memoria.aprender_alias(texto, ref, proveedor,
+                                   nota=f"confirmado en pantalla {dt.date.today().isoformat()}")
+
+    def confirmar(ref):
+        """Las tarjetas con botón verde muestran el producto y el cambio de costo: apretarlo
+        es decir "este producto, este costo". Si la app no estaba segura del producto (lo
+        matcheó por nombre), queda aprendido; si no, la tarjeta volvía a aparecer con otra
+        pregunta ("Revisalo antes de importar") y parecía que el botón no hacía nada."""
+        if ref and r.get("estado") == "revisar":
+            aprender(ref)
+        e["aprobados"].append([clave, ref])
+
     if accion == "elegir":
         ref = request.form.get("elegido", "")
         buscado = request.form.get("buscado", "").strip()
         if buscado:          # eligió con el buscador: se busca la referencia por nombre
-            cat = catalogo(e)
-            hit = cat[cat.nombre_completo == buscado]
-            if not len(hit):
-                # el navegador no siempre completa el valor exacto de la lista (mayúsculas,
-                # tildes, espacios de más si se tipeó a mano): comparar ignorando eso antes
-                # de rendirse. Sin esto, un producto tipeado "distinto" no encontraba nada
-                # y la elección se perdía en silencio, sin avisar.
-                hit = cat[cat.nombre_completo.map(normalizar) == normalizar(buscado)]
-            if len(hit):
-                ref = hit.iloc[0]["referencia"]
+            ref = producto_por_nombre(catalogo(e), buscado)
+            if not ref:
+                # NO caer en la opción marcada: es la sugerencia que la persona está corrigiendo
+                return redirect(url_for("revisar", no_encontrado=buscado) + "#confirmar")
         if ref:
-            if es_lista and codigo:
-                memoria.aprender_codigo(distribuidor, codigo, texto, ref)
-            else:
-                memoria.aprender_alias(texto, ref, proveedor,
-                                       nota=f"confirmado en pantalla {dt.date.today().isoformat()}")
+            aprender(ref)
             # vio el costo actual y el nuevo al elegir: la variación queda aprobada para este ciclo
             e["aprobados"].append([clave, ref])
             e["fuente_ok"].append([clave, ref])
     elif accion == "aprobar":
-        e["aprobados"].append([clave, ref_actual])
+        confirmar(ref_actual)
     elif accion == "fuente_ok":
+        confirmar(ref_actual)
         e["fuente_ok"].append([clave, ref_actual])
     elif accion == "bulto":           # la lista cotiza el bulto cerrado: se divide, y queda aprendido
         n = int(request.form.get("unidades") or 0)
@@ -659,10 +685,10 @@ def decidir():
         e["saltados"] = [s for s in e["saltados"] if s != clave]
     elif accion == "gramaje":
         memoria.aprobar(ref_actual, "gramaje", f"{texto} ({proveedor}): cambia la presentación")
-        e["aprobados"].append([clave, ref_actual])
+        confirmar(ref_actual)
     elif accion == "presentacion":
         memoria.aprobar(ref_actual, "presentacion", f"{texto} ({proveedor}): mismo producto, el nombre queda")
-        e["aprobados"].append([clave, ref_actual])
+        confirmar(ref_actual)
     elif accion == "ignorar":
         if es_lista and codigo:
             memoria.aprender_codigo(distribuidor, codigo, texto, "")
@@ -762,14 +788,17 @@ def verificar_import():
     except ErrorDeDatos as err:
         return mostrar_generado(archivos, error=str(err))
     esperado = pd.read_json(CICLO / "ultimo_import.json", orient="records", dtype={"default_code": str})
-    v = verificar(esperado, catalogo(e), despues)
-    # el historial guarda si el costo realmente quedó en Odoo
+    antes = catalogo(e)
+    v = verificar(esperado, antes, despues)
+    # el historial guarda si el costo realmente quedó en Odoo. Se cruza por ID externo:
+    # la Referencia interna puede estar vacía en muchos productos a la vez
     h = memoria.leer("historial")
     fecha = e.get("generado", {}).get("fecha", "")
-    estados = dict(zip(v["control"]["default_code"].astype(str), v["control"]["estado"]))
+    estados = dict(zip(v["control"]["id"], v["control"]["estado"]))
+    id_de = dict(zip(antes["referencia"], antes["id_externo"]))
     mask = (h["fecha"] == fecha) & (h["estado"] == "generado")
     h.loc[mask, "estado"] = h.loc[mask, "referencia"].map(
-        lambda r: "verificado" if estados.get(r) == "ok" else "no se aplicó")
+        lambda r: "verificado" if estados.get(id_de.get(r)) == "ok" else "no se aplicó")
     memoria.guardar("historial", h)
     return mostrar_generado(archivos, verificacion=v)
 
@@ -797,11 +826,10 @@ def agregar_memoria():
     campos = {c: request.form.get(c, "").strip() for c in TABLAS_AGREGABLES[nombre]}
     if nombre == "codigos_proveedor":
         if campos["proveedor"] and campos["codigo_proveedor"] and campos["buscado"]:
-            cat = catalogo(leer_estado())
-            hit = cat[cat.nombre_completo == campos["buscado"]] if cat is not None else None
-            if hit is not None and len(hit):
+            ref = producto_por_nombre(catalogo(leer_estado()), campos["buscado"])
+            if ref:
                 memoria.aprender_codigo(campos["proveedor"], campos["codigo_proveedor"],
-                                        campos["descripcion_proveedor"], hit.iloc[0]["referencia"])
+                                        campos["descripcion_proveedor"], ref)
     elif campos[TABLAS_AGREGABLES[nombre][0]]:
         campos["nota"] = request.form.get("nota", "").strip()
         memoria.agregar(nombre, campos)

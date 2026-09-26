@@ -231,12 +231,16 @@ function adivinar(archivo) {
 }
 function filaIva(fila, nombre) {
   var p = buscar(nombre), caja = fila.querySelector('.iva');
+  // se redibuja al cambiar el proveedor (y eso pasa recién al salir del campo, a veces al
+  // apretar "Agregar"): sin guardar lo elegido, el IVA volvía a quedar vacío y el navegador
+  // frenaba el envío
+  var sel = caja.querySelector('select'), elegido = sel ? sel.value : '';
   if (p && p.iva) {
     caja.innerHTML = '<span class="gris">IVA: ' + IVA[p.iva] + '</span> <a href="#" class="cambiar">cambiar</a>' +
                      '<input type="hidden" name="iva" value="">';
     caja.querySelector('.cambiar').onclick = function (ev) { ev.preventDefault(); caja.innerHTML = selectorIva(p.iva); };
   } else {
-    caja.innerHTML = selectorIva('');
+    caja.innerHTML = selectorIva(elegido);
   }
 }
 function selectorIva(valor) {

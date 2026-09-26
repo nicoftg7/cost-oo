@@ -88,7 +88,7 @@ def rotacion(d, cat, grupos):
                 continue
             c = c.iloc[0]
             deberia = m.referencia in mencionadas
-            filas.append({"grupo": grupo, "referencia": m.referencia,
+            filas.append({"grupo": grupo, "referencia": m.referencia, "default_code": c.default_code,
                           "nombre_completo": c.nombre_completo, "id_externo": c.id_externo,
                           "mencionado": deberia, "publicado_hoy": bool(c.publicado),
                           "deberia_estar": deberia,
@@ -120,8 +120,8 @@ def clasificar(d, notas, cat, memoria, aprobados_ciclo=(), saltados=(), fuente_o
 
     if len(d):
         d = d.copy()
-        for c in ("referencia", "desajuste", "via", "nombre_odoo", "alternativas", "mes",
-                  "fuente", "origen", "codigo", "huella", "proveedor", "proveedor_bloque"):
+        for c in ("referencia", "default_code", "desajuste", "via", "nombre_odoo", "alternativas",
+                  "mes", "fuente", "origen", "codigo", "huella", "proveedor", "proveedor_bloque"):
             if c not in d:
                 d[c] = ""
             d[c] = d[c].fillna("")
@@ -271,7 +271,7 @@ def control(res, margen_variable=(), umbral=UMBRAL_REVISAR_A_OJO):
             marcas.append("no tenía costo")
         if r.get("referencia") in nombres:
             marcas.append(f"cambia el nombre a: {nombres[r['referencia']]}")
-        filas.append({"referencia": r.get("referencia", ""), "producto": r.get("nombre_odoo", ""),
+        filas.append({"referencia": r.get("default_code", ""), "producto": r.get("nombre_odoo", ""),
                       "costo_antes": antes, "costo_nuevo": nuevo, "variacion_%": var,
                       "precio_venta": pv or None, "precio_venta_estimado": pv_estimado,
                       "margen_%": margen, "margen": "variable" if variable else "fijo",
@@ -305,8 +305,10 @@ def filas_historial(res, fecha):
 def tabla_import(res):
     listos = res["listos"]
     nombres = res["nombres_corregidos"]
+    # default_code es la Referencia interna real (puede estar vacía); "referencia" es la clave
+    # interna de la app y, sin Referencia interna, es el ID externo: nunca va a Odoo
     return pd.DataFrame({"id": listos.id_externo.values,
-                         "default_code": listos.referencia.values,
+                         "default_code": listos.default_code.values,
                          "name": [nombres.get(r, n) for r, n in zip(listos.referencia, listos.nombre_odoo)],
                          "standard_price": listos.costo_nuevo.astype(float).round(2).values})
 
@@ -326,7 +328,7 @@ def escribir_rotacion(res, ruta):
     if not len(rot) or not (rot.accion != "sin cambio").any():
         return None
     cambios = rot[rot.accion != "sin cambio"]
-    tabla = pd.DataFrame({"id": cambios.id_externo.values, "default_code": cambios.referencia.values,
+    tabla = pd.DataFrame({"id": cambios.id_externo.values, "default_code": cambios.default_code.values,
                           "name": cambios.nombre_completo.values,
                           "is_published": cambios.deberia_estar.map({True: "TRUE", False: "FALSE"}).values})
     verificar_ids(tabla, "el archivo de publicación")

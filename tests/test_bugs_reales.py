@@ -175,6 +175,17 @@ def test_negocio_de_servicios_no_pierde_sus_productos():
     assert set(cat.referencia) == {"LIC001", "CONS001"}
 
 
+def test_producto_sin_referencia_interna_usa_el_id_externo():
+    """Sin Referencia interna, todos los productos quedaban con la misma clave vacía: no se
+    podían elegir ni aprobar, y al armar el archivo se pisaban entre sí. Un producto que SÍ
+    tiene referencia la sigue usando, así la memoria ya aprendida no se pierde; y a Odoo
+    solo vuelve la referencia real (vacía), nunca el ID interno."""
+    df = export_df([("PAS001", "Fideos 500 g - Pastas Río", 3500), ("", "Ñoquis 1 kg - Pastas Río", 4000)])
+    cat = construir(df)
+    assert list(cat.referencia) == ["PAS001", "__export__.product_template_1_ab12cd34"]
+    assert list(cat.default_code) == ["PAS001", ""]
+
+
 # ---- redes de seguridad generales ----
 def test_import_sin_inventario_ni_publicacion(tmp_path, ciclo):
     res = ciclo("Pastas Río\nFideos naturales 500 g $3600")

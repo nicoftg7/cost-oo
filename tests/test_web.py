@@ -240,3 +240,90 @@ def test_elegir_por_buscador_no_falla_por_mayusculas_o_tildes(cliente):
     assert (alias.referencia == "PAS002").any()
     _, res = modulo.resultado()
     assert list(res["listos"].referencia) == ["PAS002"]
+
+
+# ---- el caso "leches-2000": la app sugiere el dulce de leche y es la leche ----
+LACTEOS = [("DUL001", "Dulce de leche La Estancia 1 kg - Lácteos del Sur", 3500),
+           ("LEC001", "Leche entera 1 l - Lácteos del Sur", 1900),
+           ("YOG001", "Yogur bebible 1 l - Lácteos del Sur", 1200)]
+
+
+def cargar_lacteos(c, con_referencia=True):
+    df = export_df(LACTEOS)
+    if not con_referencia:
+        df["default_code"] = ""
+    buf = io.BytesIO()
+    df.to_csv(buf, index=False)
+    c.post("/export", data={"export": (io.BytesIO(buf.getvalue()), "export.csv")},
+           content_type="multipart/form-data")
+    c.post("/fuente/mensaje", data={"proveedor": "Lácteos del Sur", "texto": "dulce leches-2000\nyogur bebible 1300"})
+
+
+def tarjeta_de(modulo, texto):
+    _, res = modulo.resultado()
+    return next(t for t in res["confirmar"].to_dict("records") if texto in t["descripcion"])
+
+
+def id_de(modulo, nombre):
+    cat = modulo.catalogo(modulo.leer_estado())
+    return cat.set_index("nombre_completo").loc[nombre, "referencia"]
+
+
+@pytest.mark.parametrize("con_referencia", [True, False])
+def test_elegir_otro_producto_que_el_sugerido(cliente, con_referencia):
+    """Muchos negocios no cargan la Referencia interna en Odoo. La app identificaba cada
+    producto solo por ella: sin ella, todas las opciones mandaban el mismo valor vacío y
+    "Es este producto" no hacía nada; solo funcionaba "No lo vendemos". Además, todos los
+    productos sin referencia contaban como el mismo, así que se pisaban entre sí al armar
+    el archivo. Ahora, sin Referencia interna, la app usa el ID externo por dentro."""
+    modulo, c = cliente
+    cargar_lacteos(c, con_referencia)
+    t = tarjeta_de(modulo, "dulce leches")
+    assert t["nombre_odoo"].startswith("Dulce de leche")           # la sugerencia equivocada
+    leche = id_de(modulo, "Leche entera 1 l - Lácteos del Sur")
+    assert leche                                                   # nunca vacío
+    c.post("/decidir", data={"clave": t["clave_renglon"], "accion": "elegir", "elegido": leche})
+    t = tarjeta_de(modulo, "yogur")
+    c.post("/decidir", data={"clave": t["clave_renglon"], "accion": "aprobar", "referencia": t["referencia"]})
+
+    _, res = modulo.resultado()
+    assert res["confirmar"].empty
+    assert sorted(res["listos"].nombre_odoo) == ["Leche entera 1 l - Lácteos del Sur", "Yogur bebible 1 l - Lácteos del Sur"]
+    c.post("/generar")
+    imp = pd.read_excel(next(modulo.SALIDAS.glob("IMPORTAR*.xlsx")), dtype=str).fillna("")
+    # a Odoo va la Referencia interna real: vacía si no la tiene, nunca el ID de adentro
+    esperado = {"LEC001", "YOG001"} if con_referencia else {""}
+    assert set(imp.default_code) == esperado
+    assert set(imp.id) == {"__export__.product_template_1_ab12cd34", "__export__.product_template_2_ab12cd34"}
+
+
+def test_aprobar_costo_confirma_tambien_el_producto(cliente):
+    """Si la app no estaba segura del producto Y el costo cambiaba mucho, la tarjeta solo
+    decía "El costo cambia más de un 30%". Aprobar sacaba esa alerta, pero la tarjeta volvía
+    a aparecer ("Revisalo antes de importar"): parecía que el botón no hacía nada. Ahora la
+    tarjeta avisa que duda del producto, y aprobar confirma las dos cosas, y se aprende."""
+    modulo, c = cliente
+    cargar_lacteos(c)
+    pagina = c.get("/revisar").get_data(as_text=True)
+    assert "No estoy seguro de que sea este producto. El costo cambia" in pagina
+    t = tarjeta_de(modulo, "dulce leches")
+    c.post("/decidir", data={"clave": t["clave_renglon"], "accion": "aprobar", "referencia": t["referencia"]})
+    _, res = modulo.resultado()
+    assert "DUL001" in set(res["listos"].referencia)
+    assert not any("dulce leches" in d for d in res["confirmar"].descripcion)
+    assert (modulo.memoria.leer("alias").referencia == "DUL001").any()
+
+
+def test_buscador_sin_resultado_no_confirma_la_sugerencia_marcada(cliente):
+    """Con el buscador escrito pero sin encontrar nada, se confirmaba la opción que venía
+    marcada, que es justamente la sugerencia que la persona estaba corrigiendo: la app
+    aprendía "leches = dulce de leche". Ahora no se guarda nada y se avisa en pantalla."""
+    modulo, c = cliente
+    cargar_lacteos(c)
+    t = tarjeta_de(modulo, "dulce leches")
+    r = c.post("/decidir", data={"clave": t["clave_renglon"], "accion": "elegir",
+                                 "elegido": t["referencia"], "buscado": "leche de almendras"},
+               follow_redirects=True)
+    assert "No encontré “leche de almendras”" in r.get_data(as_text=True)
+    assert modulo.memoria.leer("alias").empty
+    assert tarjeta_de(modulo, "dulce leches")["referencia"] == "DUL001"

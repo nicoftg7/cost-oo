@@ -26,7 +26,7 @@ SIN_ID = (
     "(exportación compatible con importación)\". Sin esa columna Odoo crea productos "
     "nuevos en vez de actualizar los que ya existen, y eso no se puede deshacer.")
 
-COLUMNAS = ["id_externo", "referencia", "nombre_completo", "producto", "proveedor",
+COLUMNAS = ["id_externo", "referencia", "default_code", "nombre_completo", "producto", "proveedor",
             "costo_actual", "precio_venta", "sitio_web", "categoria", "etiquetas",
             "stock", "publicado", "marcas", "clave", "clave_prov"]
 
@@ -131,8 +131,14 @@ def construir(fuente, quitar_repetidos=True, no_son_productos=()):
     partes = df["nombre_completo"].map(partir)
     df["producto"] = partes.map(lambda p: p[0])
     df["proveedor"] = partes.map(lambda p: p[1])
-    df["referencia"] = texto(c_ref)
     df["id_externo"] = texto(c_id)
+    # "referencia" es la clave con la que la app identifica cada producto (memoria, alias,
+    # aprobaciones). Muchos negocios no cargan la Referencia interna en Odoo: sin ella, todos
+    # los productos quedaban con la misma clave vacía y no se podía elegir ni aprobar ninguno.
+    # El ID externo siempre está (sin él no se llega hasta acá). La Referencia interna real
+    # queda en default_code: es lo único que se escribe de vuelta en Odoo.
+    df["default_code"] = texto(c_ref)
+    df["referencia"] = [dc or ide for dc, ide in zip(df["default_code"], df["id_externo"])]
     df["costo_actual"] = numero(c_cost)
     df["precio_venta"] = numero(c_pv)
     df["sitio_web"] = texto(c_web)
@@ -157,5 +163,5 @@ def construir(fuente, quitar_repetidos=True, no_son_productos=()):
 def resumen(cat):
     return {"productos": len(cat),
             "proveedores": int(cat["proveedor"].replace("", pd.NA).nunique()),
-            "sin_referencia": int((cat["referencia"] == "").sum()),
+            "sin_referencia": int((cat["default_code"] == "").sum()),
             "sin_id": int((cat["id_externo"] == "").sum())}

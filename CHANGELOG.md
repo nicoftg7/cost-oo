@@ -283,6 +283,47 @@ per-user pricing, per-hour billing, multi-plan messages, annual-vs-monthly equiv
 typos, abbreviations, and emoji. Every catalog built correctly with its services intact, and
 after the two fixes above, no more mangled descriptions or mis-scaled prices turned up.
 
+## Phase 11 — The first hands-on test by someone other than the developer
+
+Every test up to here was written by the same person who wrote the code, and it showed. The
+first time the app was driven by hand — a fresh test business, a real distributor PDF, a
+one-line supplier message — the core confirmation screen didn't work, and "I told you it was
+ready" had to be taken back. What went wrong, in order of how much it mattered:
+
+- **Every synthetic product in every test had an Odoo "internal reference" filled in.** Real
+  catalogs often don't. The app used that reference as the only way to tell products apart,
+  so with it empty, every product looked identical: every option on the "which product is
+  it?" screen sent the same blank value, "This is the product" silently did nothing, and
+  the only button that worked was "we don't sell this" (because that one is stored by text,
+  not by product). Worse, when building the import file, every reference-less product counted
+  as the *same* product, so at most one of them could ever be exported per cycle. The fix
+  uses Odoo's external ID (which the app already requires) as the internal key whenever the
+  reference is missing — while products that do have a reference keep using it, so memory a
+  business has already built up keeps working, and only the real (possibly empty) reference
+  is ever written back to Odoo.
+- **"Approve this cost" didn't finish the job.** When the app was unsure about the product
+  *and* the cost jumped more than 30%, the card only mentioned the cost. Approving cleared
+  that alert, but the card came straight back asking about the product — which looked
+  exactly like the button doing nothing. The card now says it's unsure about the product,
+  and approving (the button sits right under the product's name) confirms both, and is
+  remembered.
+- **The "search by name" fallback had two silent failures.** A name that didn't match the
+  catalog letter for letter (case, accents, spacing) was simply dropped. And when that
+  happened, the app fell back to whichever option was pre-selected — which is the wrong
+  suggestion the person was trying to correct. It now matches ignoring case and accents, and
+  if it still finds nothing, it saves nothing and says so on screen.
+- **Smaller ones found on the same pass:** a real distributor list that identifies products
+  by barcode only (no separate internal code) was read as zero items; one price in it written
+  without a thousands separator made every other price in the list parse wrong; a list with
+  the exact same row twice produced a "which of these two wins?" card that pointed at itself;
+  and on the upload screen, editing the supplier's name after picking the VAT option silently
+  reset the VAT option.
+
+The lesson is the one this changelog keeps relearning in different forms: the bugs that
+matter live in the gap between the data you imagine and the data people actually have. The
+fixes were all tested the way the bug was found this time — by driving a real browser, click
+by click, with and without internal references — not just by calling the code directly.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

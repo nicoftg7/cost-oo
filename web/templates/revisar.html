@@ -80,6 +80,7 @@ Cada costo dice de qué mensaje o lista salió.</p>
 </div>
 
 <h2 id="confirmar">👀 Para confirmar</h2>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
 {% if not tarjetas %}
 <div class="caja">🎉 No queda nada por confirmar.</div>
 {% endif %}

@@ -178,8 +178,9 @@ class Contexto:
 
 def _datos_producto(fila):
     return {"id_externo": fila.id_externo, "referencia": fila.referencia,
-            "nombre_odoo": fila.nombre_completo, "costo_actual": float(fila.costo_actual),
-            "pv_actual": float(fila.precio_venta), "publicado": bool(fila.publicado)}
+            "default_code": fila.default_code, "nombre_odoo": fila.nombre_completo,
+            "costo_actual": float(fila.costo_actual), "pv_actual": float(fila.precio_venta),
+            "publicado": bool(fila.publicado)}
 
 
 def _opciones(cands):
