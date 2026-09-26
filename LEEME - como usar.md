@@ -38,7 +38,7 @@ datos, otro puerto). Tocá *Cargar el ejemplo y analizar*, respondé lo que preg
    - **Planilla de Google Sheets**: un clic. Los mensajes que ya se procesaron se saltean solos.
      La app también avisa qué proveedores de la pestaña *Lista* todavía no cargaste, y recuerda
      los de la pestaña *Manual*.
-   - **Listas de precios** en PDF, Excel o foto: arrastrás una o varias y elegís de qué proveedor es cada
+   - **Listas de precios** en PDF, Excel, Word o foto: arrastrás una o varias y elegís de qué proveedor es cada
      una. La primera vez pregunta si la lista incluye IVA; después ya lo sabe. Si en Odoo
      cargás el costo sin IVA, decilo en *Lo aprendido → datos del negocio*: a las listas con IVA
      se les saca, en vez de sumárselo a las que vienen sin.

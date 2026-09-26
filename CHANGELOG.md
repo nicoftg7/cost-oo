@@ -391,6 +391,12 @@ only offered PDF and Excel, and the upload check rejected anything without item 
 photo or a code-less list goes in from the same place as any other list, with a test that
 uploads a photo through the screen.
 
+Word documents too: suppliers send price lists as .docx, so the reader now takes them without
+a new dependency (a .docx is a zip of XML). Tables are read like an Excel sheet, the rest like a
+PDF, and a Word file that is just a pasted photo — common — goes through OCR. Walking through
+it in a real browser also caught the review screen saying "0 items read" for a photo whose
+prices had been read fine (as a message); it now says how many prices it found and how.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

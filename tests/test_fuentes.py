@@ -650,3 +650,57 @@ def test_lista_en_foto_se_lee_con_ocr():
     texto = texto_de_imagen(buf.getvalue())
     assert "$2500" in texto and "$900" in texto
     assert "Yerba" in texto and "Harina" in texto
+
+
+# ---------- listas en Word ----------
+def test_lista_en_word_con_tabla():
+    from docx_de_prueba import docx
+    from core.pricelist import leer_fuente
+    doc = docx("LISTA DE PRECIOS - SEPTIEMBRE", "Distribuidora del Centro",
+               [["Código", "Descripción", "Precio"],
+                ["AL-0100", "FIDEOS NATURALES PASTAS RIO 500 GR", "$ 3.250,50"],
+                ["AL-0101", "CANELONES DE VERDURA X 6", "$ 9.900,00"]],
+               [["Teléfono", "Dirección"], ["341 555-0000", "Calle Falsa 123"]])   # una tabla sin precios
+    l = leer_fuente("lista.docx", doc)
+    assert [(a["codigo"], a["precio"]) for a in l.articulos] == [("AL-0100", 3250.5), ("AL-0101", 9900.0)]
+
+
+def test_lista_en_word_sin_tabla_se_lee_renglon_por_renglon():
+    from docx_de_prueba import docx
+    from core.pricelist import leer_fuente
+    doc = docx("Lista mayorista", "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3000.000 20",
+               "AL-0101 CANELONES DE VERDURA X 6 9500.000 20")
+    l = leer_fuente("lista.docx", doc)
+    assert [a["codigo"] for a in l.articulos] == ["AL-0100", "AL-0101"]
+
+
+def test_word_sin_codigos_se_lee_como_mensaje(catalogo, memoria):
+    """El Word que manda un productor: nombres y precios, sin códigos."""
+    from docx_de_prueba import docx
+    doc = docx("Hola! Precios de esta semana", "Fideos naturales 500 g $3600", "Canelones verdura x 6 $9900")
+    f = {"tipo": "lista", "nombre": "precios.docx", "proveedor": "Pastas Río", "contenido": doc}
+    res = correr_fuentes(catalogo, memoria, [f])
+    assert set(res["listos"].referencia) == {"PAS001", "PAS004"}
+
+
+def test_word_que_es_solo_una_foto_pegada_se_lee_con_ocr():
+    pytest.importorskip("rapidocr")
+    from PIL import Image, ImageDraw, ImageFont
+    from docx_de_prueba import docx
+    from core.pricelist import leer_fuente
+    img = Image.new("RGB", (1000, 340), "white")
+    dibujo, fuente = ImageDraw.Draw(img), ImageFont.load_default(size=52)
+    for i, linea in enumerate(["Fideos naturales 500 g   $3600", "Canelones x 6   $9900"]):
+        dibujo.text((50, 50 + i * 130), linea, fill="black", font=fuente)
+    foto = io.BytesIO()
+    img.save(foto, "JPEG")
+    l = leer_fuente("lista.docx", docx(fotos=[foto.getvalue()]))
+    assert l.de_foto and "3600" in l.texto and "9900" in l.texto
+
+
+def test_word_sin_precios_avisa():
+    from docx_de_prueba import docx
+    from core.pricelist import leer_fuente
+    with pytest.raises(ErrorDeDatos, match="No encontré precios"):
+        leer_fuente("carta.docx", docx("Estimados clientes:", "Les avisamos que la semana que viene no hay reparto."))
+

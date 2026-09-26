@@ -1,4 +1,4 @@
-"""Listas de precios de proveedores: PDF, Excel, CSV o foto.
+"""Listas de precios de proveedores: PDF, Excel, CSV, Word o foto.
 
 leer_fuente() devuelve una Lectura: artículos con código (lo mejor: el código se aprende
 y el mes siguiente entra solo) o, si la lista no tiene códigos, su texto para leerlo como
@@ -13,6 +13,7 @@ Formatos que aparecieron hasta ahora (cada uno con su prueba):
   - lista, descuento y neto:                     01-0112 Atún ... 2,226.21 18.78% 1,808.13
   - anterior, aumento y final:                   300 BONDIOLA 20472 7% 21905
   - sin códigos (un mensaje en PDF) o una foto:  se lee como mensaje
+  - Word: sus tablas como un Excel, su texto como un PDF, y si solo trae fotos pegadas, OCR
 """
 import io
 import re
@@ -461,6 +462,8 @@ def _campos_por_nombre(etiquetas):
 
 
 def leer_tabla(nombre, contenido, idx=None):
+    if es_docx(contenido):
+        raise ErrorDeDatos(f"{nombre} es un documento de Word, no una planilla.")
     try:
         if contenido[:2] == b"PK" or nombre.lower().endswith((".xlsx", ".xls")):   # xlsx es un zip
             df = pd.read_excel(io.BytesIO(contenido), dtype=str)
@@ -468,7 +471,10 @@ def leer_tabla(nombre, contenido, idx=None):
             df = pd.read_csv(io.BytesIO(contenido), dtype=str, sep=None, engine="python", encoding="utf-8-sig")
     except Exception as e:
         raise ErrorDeDatos(f"No pude leer la lista {nombre} ({e}).")
-    df = df.fillna("")
+    return _articulos_de_df(nombre, df.fillna(""), idx)
+
+
+def _articulos_de_df(nombre, df, idx=None):
     # el encabezado real puede haber quedado como una fila de datos más: una fila de
     # título, de logo o de "OBSERVACIONES" arriba de todo hace que pandas tome esa (o una
     # fila vacía) como los nombres de columna. Se busca entre las primeras filas la que
@@ -507,6 +513,64 @@ def leer_tabla(nombre, contenido, idx=None):
     return _sin_codigos_repetidos(filas), []
 
 
+# ---------- Word ----------
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def es_docx(contenido):
+    if contenido[:2] != b"PK":
+        return False
+    import zipfile
+    try:
+        return "word/document.xml" in zipfile.ZipFile(io.BytesIO(contenido)).namelist()
+    except zipfile.BadZipFile:
+        return False
+
+
+def _texto_w(nodo):
+    return "".join(t.text or "" for t in nodo.iter(f"{W}t")).strip()
+
+
+def _leer_docx(nombre, contenido, idx):
+    """Las tablas se leen como un Excel; el resto del texto, renglón por renglón, como un PDF.
+    Un Word que es solo una foto pegada (pasa seguido) se lee con OCR."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+    try:
+        z = zipfile.ZipFile(io.BytesIO(contenido))
+        cuerpo = ET.fromstring(z.read("word/document.xml")).find(f"{W}body")
+    except Exception as e:
+        raise ErrorDeDatos(f"No pude leer el documento {nombre} ({e}).")
+    lineas, articulos = [], []
+    for bloque in cuerpo:
+        if bloque.tag == f"{W}p":
+            lineas.append(_texto_w(bloque))
+        elif bloque.tag == f"{W}tbl":
+            filas = [[_texto_w(c) for c in tr.findall(f"{W}tc")] for tr in bloque.findall(f"{W}tr")]
+            filas = [f for f in filas if any(f)]
+            lineas += ["  ".join(c for c in f if c) for f in filas]
+            if len(filas) >= 2:
+                ancho = max(len(f) for f in filas)
+                df = pd.DataFrame([f + [""] * (ancho - len(f)) for f in filas[1:]],
+                                  columns=[c or f"col{i}" for i, c in enumerate(filas[0] + [""] * (ancho - len(filas[0])))])
+                try:
+                    articulos += _articulos_de_df(nombre, df, idx)[0]
+                except ErrorDeDatos:
+                    pass        # una tabla sin columna de precio (datos de contacto, etc.)
+    lineas = [l for l in lineas if l]
+    texto = "\n".join(lineas)
+    if articulos:
+        return Lectura(articulos=articulos, fecha=fecha_de(texto))
+    if len(re.sub(r"\s", "", texto)) < 20:
+        fotos = [n for n in z.namelist() if n.startswith("word/media/") and n.lower().endswith(IMAGENES)]
+        if fotos:
+            from .ocr import texto_de_imagen
+            texto = "\n".join(texto_de_imagen(z.read(n)) for n in fotos)
+            return Lectura(texto=texto, fecha=fecha_de(texto), de_foto=True)
+    articulos, no_leidos = renglones_de_texto(lineas, idx)
+    return Lectura(articulos=articulos, no_leidos=no_leidos, texto=texto, fecha=fecha_de(texto))
+
+
 # ---------- entrada única ----------
 def es_imagen(nombre, contenido):
     return (nombre.lower().endswith(IMAGENES) or contenido[:3] == b"\xff\xd8\xff"
@@ -514,8 +578,10 @@ def es_imagen(nombre, contenido):
 
 
 def leer_fuente(nombre, contenido, idx=None):
-    """PDF, Excel, CSV o foto -> Lectura. Error solo si no hay de dónde sacar precios."""
-    if es_imagen(nombre, contenido):
+    """PDF, Excel, CSV, Word o foto -> Lectura. Error solo si no hay de dónde sacar precios."""
+    if es_docx(contenido) or nombre.lower().endswith(".docx"):
+        lectura = _leer_docx(nombre, contenido, idx)
+    elif es_imagen(nombre, contenido):
         from .ocr import texto_de_imagen
         texto = texto_de_imagen(contenido)
         lectura = Lectura(texto=texto, fecha=fecha_de(texto), de_foto=True)

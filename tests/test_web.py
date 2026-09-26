@@ -276,7 +276,7 @@ def test_lista_en_foto_desde_la_pantalla(cliente):
     c.post("/export", data={"export": (io.BytesIO(buf.getvalue()), "export.csv")},
            content_type="multipart/form-data")
     modulo.memoria.registrar_proveedor("Especias Luna")        # ya pasó la bienvenida
-    assert 'accept=".pdf,.xlsx,.xls,.csv,.jpg' in c.get("/").get_data(as_text=True)
+    assert 'accept=".pdf,.xlsx,.xls,.csv,.docx,.jpg' in c.get("/").get_data(as_text=True)
     img = Image.new("RGB", (1000, 340), "white")
     dibujo, fuente = ImageDraw.Draw(img), ImageFont.load_default(size=52)
     for i, linea in enumerate(["Oregano 50 g   $660", "Comino 25 g   $704"]):
@@ -290,6 +290,8 @@ def test_lista_en_foto_desde_la_pantalla(cliente):
     _, res = modulo.resultado()
     costos = dict(zip(res["listos"].referencia, res["listos"].costo_nuevo))
     assert costos == {"ESP001": pytest.approx(660), "ESP002": pytest.approx(704)}
+    # y la pantalla no dice "0 artículos leídos" de una foto que sí se leyó
+    assert "2 precios leídos\n          (de la foto" in c.get("/revisar").get_data(as_text=True)
 
 
 def test_elegir_producto_aprende_alias(cliente):

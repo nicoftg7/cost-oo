@@ -506,7 +506,7 @@ def fuente_lista():
     listas, nuevos = [], []
     try:
         if not archivos:
-            raise ErrorDeDatos("Arrastrá al menos una lista (PDF, Excel, CSV o una foto).")
+            raise ErrorDeDatos("Arrastrá al menos una lista (PDF, Excel, Word, CSV o una foto).")
         for i, f in enumerate(archivos):
             prov = (provs[i] if i < len(provs) else "").strip()
             iva = ivas[i] if i < len(ivas) else ""

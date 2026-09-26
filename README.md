@@ -122,7 +122,7 @@ core/           the engine, no UI dependencies
   catalog.py      normalizes the Odoo export
   normalize.py    units, abbreviations, plurals
   parse.py        message structures → lines; message fingerprints
-  pricelist.py    distributor price lists: PDF (one or two columns), Excel, CSV, photos
+  pricelist.py    distributor price lists: PDF (one or two columns), Excel, CSV, Word, photos
   ocr.py          reads a photographed or scanned price list (RapidOCR)
   sheets.py       reads the tracking sheet straight from Google Sheets
   providers.py    supplier names, brands and nicknames
@@ -141,7 +141,7 @@ tests/          one test per real bug, the example tour, plus regression on real
 ## Sources, provenance and the post-import check
 
 A cycle combines any number of sources: the tracking sheet (read directly from Google Sheets),
-one-off messages with the supplier picked by hand, and distributor price lists in PDF or Excel.
+one-off messages with the supplier picked by hand, and price lists in PDF, Excel, Word or a photo.
 
 - **Messages already processed are skipped.** Each message is fingerprinted. If a supplier's row in
   the sheet still holds last month's text, those prices are already in Odoo.

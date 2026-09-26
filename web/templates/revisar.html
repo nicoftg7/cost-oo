@@ -59,6 +59,8 @@ Cada costo dice de qué mensaje o lista salió.</p>
         {{ f.analizados }} mensajes nuevos{% if f.ya_procesados %}, {{ f.ya_procesados }} ya procesados antes (sin cambios){% endif %}{% if f.sin_cambios %}, {{ f.sin_cambios }} sin mensaje{% endif %}{% if f.pendientes %}, {{ f.pendientes }} pendientes{% endif %}.
       {% elif f.tipo == 'lista' %}
         {% if f.ya_procesados %}esta misma lista ya se había procesado (ver abajo en Proveedores).
+        {% elif f.como_mensaje %}{{ f.precios or 0 }} precio{{ 's' if f.precios != 1 }} leído{{ 's' if f.precios != 1 }}
+          ({{ 'de la foto' if f.de_foto else 'sin códigos' }}: se lee como un mensaje).
         {% else %}{{ f.articulos }} artículos leídos.
           {% if f.no_leidos %}<details style="display:inline"><summary>{{ f.no_leidos|length }} renglones no se pudieron leer</summary>
             <div class="adentro gris">{% for l in f.no_leidos %}{{ l }}<br>{% endfor %}

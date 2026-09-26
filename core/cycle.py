@@ -187,6 +187,7 @@ def correr_fuentes(catalogo, memoria, fuentes, aprobados_ciclo=(), saltados=(), 
                 info["analizados"] = 1
                 inicial = es_proveedor(distribuidor, ctx.idx) or distribuidor
                 r, n = _renglones_de_texto(lectura.texto, ctx, distribuidor, nombre, h, inicial)
+                info["precios"] = sum(1 for x in r if x.get("tipo") == "costo")
                 renglones += r
                 notas += n
             else:
@@ -235,7 +236,7 @@ def correr_fuentes(catalogo, memoria, fuentes, aprobados_ciclo=(), saltados=(), 
 def fuente_de_archivo(nombre, contenido, proveedor=""):
     """Decide qué tipo de fuente es un archivo subido."""
     n = nombre.lower()
-    if n.endswith((".pdf", ".xlsx", ".xls")):
+    if n.endswith((".pdf", ".xlsx", ".xls", ".docx")):
         if not proveedor:
             raise ErrorDeDatos(f"Para la lista {nombre} falta decir de qué distribuidora es.")
         return {"tipo": "lista", "nombre": nombre, "proveedor": proveedor, "contenido": contenido}
