@@ -28,6 +28,7 @@ from core.normalize import normalizar
 from core.providers import indice_proveedores
 from core import sheets
 from core.verify import verificar
+from core.transform import costo_de_lista
 
 RAIZ = Path(__file__).resolve().parents[1]
 # ACTUALIZADOR_DATOS permite apuntar a otra carpeta (pruebas, o varios negocios)
@@ -230,12 +231,14 @@ def tarjetas(res):
             # la alerta del costo tapa que tampoco está seguro del producto: decirlo
             explicacion = "No estoy seguro de que sea este producto. " + explicacion
         if alerta == "falta IVA":
-            explicacion = "La lista viene sin IVA: falta saber qué IVA lleva este producto."
+            incluido = bool(r.get("iva_incluido"))
+            explicacion = ("La lista viene con IVA y tu costo va sin IVA: falta saber qué IVA sacarle a este producto."
+                           if incluido else "La lista viene sin IVA: falta saber qué IVA lleva este producto.")
             perc = float(r.get("percepcion") or 0)
             base = float(r.get("precio_lista") or 0)
             sugerido = float(r.get("iva_sugerido") or 0.21)
-            r["opciones_iva"] = [{"valor": v, "texto": t, "costo": round(base * (1 + v) * (1 + perc), 2),
-                                  "sugerido": abs(v - sugerido) < 1e-9}
+            r["opciones_iva"] = [{"valor": v, "texto": t, "sugerido": abs(v - sugerido) < 1e-9,
+                                  "costo": costo_de_lista(base, v, perc, incluido, memoria.costo_sin_iva())}
                                  for v, t in ((0.21, "21%"), (0.105, "10,5%"))]
         out.append({**r, "tipo_tarjeta": tipo, "explicacion": explicacion, "opciones": opciones,
                     "id_tarjeta": f"{r['clave_renglon']}-{r.get('referencia') or 'x'}"})
@@ -262,11 +265,16 @@ def falta_configurar():
 
 @app.route("/bienvenida", methods=["GET", "POST"])
 def bienvenida():
-    """Tres pasos para un negocio que empieza: nombre, proveedores y (opcional) la planilla."""
+    """Cuatro pasos para un negocio que empieza: nombre, costo con o sin IVA, proveedores y
+    (opcional) la planilla. También sirve para cambiarlos después."""
     if request.method == "GET":
-        return render_template("bienvenida.html", config=leer_config(), error=None)
+        return render_template("bienvenida.html", config=leer_config(), error=None,
+                               costo_sin_iva=memoria.costo_sin_iva())
     c = leer_config()
     c["negocio"] = request.form.get("negocio", "").strip()
+    if request.form.get("costo_iva") in ("con", "sin"):
+        memoria.fijar_costo_sin_iva(request.form["costo_iva"] == "sin")
+        _cache["resultado"] = None
     lineas = request.form.get("proveedores", "").splitlines()
     archivo = request.files.get("archivo_proveedores")
     if archivo and archivo.filename:
@@ -287,7 +295,8 @@ def bienvenida():
         try:
             sheets.url_csv(url)
         except ErrorDeDatos as err:
-            return render_template("bienvenida.html", config=c, error=str(err)), 400
+            return render_template("bienvenida.html", config=c, error=str(err),
+                                   costo_sin_iva=memoria.costo_sin_iva()), 400
         c["sheets_url"] = url
     c["configurado"] = True
     guardar_config(c)
@@ -847,6 +856,7 @@ def ver_memoria():
     cat = catalogo(leer_estado())
     return render_template("memoria.html", tablas=tablas, conteos=memoria.conteos(),
                            proveedores=ficha_proveedores(), iva_opciones=IVA_OPCIONES,
+                           costo_sin_iva=memoria.costo_sin_iva(),
                            abrir_proveedores=request.args.get("abrir") == "proveedores",
                            guardado=bool(request.args.get("guardado")),
                            historial=hist.tail(300).iloc[::-1].to_dict("records"),

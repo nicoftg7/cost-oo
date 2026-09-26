@@ -39,7 +39,9 @@ datos, otro puerto). Tocá *Cargar el ejemplo y analizar*, respondé lo que preg
      La app también avisa qué proveedores de la pestaña *Lista* todavía no cargaste, y recuerda
      los de la pestaña *Manual*.
    - **Listas de precios** en PDF o Excel: arrastrás una o varias y elegís de qué proveedor es cada
-     una. La primera vez pregunta si la lista incluye IVA; después ya lo sabe.
+     una. La primera vez pregunta si la lista incluye IVA; después ya lo sabe. Si en Odoo
+     cargás el costo sin IVA, decilo en *Lo aprendido → datos del negocio*: a las listas con IVA
+     se les saca, en vez de sumárselo a las que vienen sin.
    - **Mensaje suelto**: elegís el proveedor y pegás el mensaje.
    - Si un proveedor no está en la lista para elegir, escribí su nombre: queda guardado.
 3. **Analizá y confirmá lo amarillo.** Son los casos en que la app no está segura.

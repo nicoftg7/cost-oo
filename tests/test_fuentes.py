@@ -183,6 +183,51 @@ def test_iva_de_la_ficha_se_aplica(catalogo, memoria):
     assert correr_fuentes(catalogo, memoria, [f])["listos"].iloc[0]["costo_nuevo"] == pytest.approx(3000.0)
 
 
+def costo_de(catalogo, memoria, f):
+    res = correr_fuentes(catalogo, memoria, [f])
+    return res["listos"].iloc[0]["costo_nuevo"] if len(res["listos"]) else None
+
+
+@pytest.mark.parametrize("iva_lista, precio, con_iva, sin_iva", [
+    ("incluido", 3630, 3630, 3000),          # con IVA: al negocio que carga sin IVA se le saca
+    ("21", 3000, 3630, 3000),                # sin IVA: al que carga con IVA se le suma
+    ("21+3", 3000, 3738.9, 3000),            # la percepción tampoco va en un costo sin IVA
+    ("mixto", 3000, None, 3000),             # sin IVA y costo sin IVA: no hace falta la alícuota
+    ("incluido-mixto", 3630, 3630, None),    # con IVA y costo con IVA: tampoco
+])
+def test_costo_con_o_sin_iva_segun_el_negocio(catalogo, memoria, iva_lista, precio, con_iva, sin_iva):
+    memoria.fijar_iva("Distribuidora Uno", iva_lista)
+    memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "PAS001")
+    f = lista("Distribuidora Uno", f"AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR {precio}.000 20")
+    for sin, esperado in ((False, con_iva), (True, sin_iva)):
+        memoria.fijar_costo_sin_iva(sin)
+        costo = costo_de(catalogo, memoria, f)
+        assert costo == (pytest.approx(esperado) if esperado else None), (sin, costo)
+
+
+def test_lista_con_iva_mixto_y_costo_sin_iva_pregunta_cuanto_sacarle(catalogo, memoria):
+    memoria.fijar_costo_sin_iva(True)
+    memoria.fijar_iva("Distribuidora Uno", "incluido-mixto")
+    memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "PAS001")
+    f = lista("Distribuidora Uno", "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3315.000 20")
+    c = correr_fuentes(catalogo, memoria, [f])["confirmar"].iloc[0]
+    assert c["alerta"] == "falta IVA" and c["iva_incluido"]
+    memoria.fijar_iva_producto("PAS001", 0.105, 0)
+    assert costo_de(catalogo, memoria, f) == pytest.approx(3000.0)      # 3315 / 1,105
+
+
+def test_proveedor_con_iva_incluido_de_antes_tambien_se_descuenta(catalogo, memoria):
+    """Antes "con IVA incluido" solo quedaba en la ficha, sin regla en impuestos.csv."""
+    memoria.registrar_proveedor("Distribuidora Uno")
+    df = memoria.leer("proveedores")
+    df.loc[0, "iva_lista"] = "incluido"
+    memoria.guardar("proveedores", df)
+    memoria.fijar_costo_sin_iva(True)
+    memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "PAS001")
+    f = lista("Distribuidora Uno", "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3630.000 20")
+    assert costo_de(catalogo, memoria, f) == pytest.approx(3000.0)
+
+
 def test_lista_que_cotiza_el_bulto(catalogo, memoria):
     """'10 x 500 GR $35.000' contra $3.500 en Odoo: es el bulto de 10."""
     memoria.aprender_codigo("Distribuidora Tres", "46001", "FIDEOS", "PAS001")

@@ -166,6 +166,7 @@ label.campo input, label.campo select, .fila-form input {
   display: block; width: 100%; font: inherit; font-weight: 400; padding: 8px 10px; margin-top: 4px;
   border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); color: var(--tinta);
 }
+label.opcion { display: flex; gap: 8px; align-items: baseline; font-weight: 400; margin: 8px 0; cursor: pointer; }
 .fila-form { display: flex; gap: 8px; align-items: center; }
 .fila-form input { margin-top: 0; }
 .fila-form .boton { margin-top: 0; flex: none; }

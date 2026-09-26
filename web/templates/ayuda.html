@@ -60,7 +60,10 @@ encuentra cada producto en Odoo y arma un archivo para importar los costos nuevo
   (por ejemplo AL-0014) y desde la próxima lista esos productos entran solos, aunque la descripción cambie.</p>
   <p>La primera vez que cargás la lista de un proveedor te pregunta si los precios incluyen IVA. Queda guardado en su ficha
   (en <a href="{{ url_for('ver_memoria') }}#proveedores">Lo aprendido → Proveedores</a>) y no vuelve a preguntar.</p>
-  <p>Si la lista viene sin IVA y mezcla alícuotas (la harina va al 10,5% y el resto al 21%, algo común en cooperativas mayoristas), elegí
+  <p>Con eso y con cómo cargás el costo en Odoo (con IVA o sin IVA, en <a href="{{ url_for('bienvenida') }}">datos del negocio</a>)
+  la app hace la cuenta: si tu costo va con IVA y la lista viene sin IVA, se lo suma; si tu costo va sin IVA y la lista viene
+  con IVA, se lo saca (un precio de $1.210 con IVA 21% queda en $1.000). Si tu costo va sin IVA, la percepción tampoco se suma.</p>
+  <p>Si la lista mezcla alícuotas (la harina va al 10,5% y el resto al 21%, algo común en cooperativas mayoristas), elegí
   <b>“21% o 10,5% según el producto”</b>. La primera vez que aparece cada producto, la app pregunta qué IVA lleva y sugiere
   uno. Queda guardado para ese producto.</p>
   <p>Algunas listas cotizan el <b>bulto cerrado</b> (“HARINA 10 x 1 Kg”). Si el precio dividido por el bulto queda cerca del

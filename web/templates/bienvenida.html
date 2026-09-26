@@ -3,7 +3,7 @@
 <h1>👋 Bienvenido</h1>
 <p class="bajada">Esta app lee los precios que mandan tus proveedores (mensajes de WhatsApp, planillas, listas en PDF o
 Excel), encuentra cada producto en tu Odoo y arma el archivo para actualizar los costos. Antes de empezar, contale
-tres cosas de tu negocio. Todo se puede cambiar después.</p>
+cuatro cosas de tu negocio. Todo se puede cambiar después.</p>
 
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
@@ -20,6 +20,18 @@ tres cosas de tu negocio. Todo se puede cambiar después.</p>
   <div class="caja paso">
     <div class="num">2</div>
     <div>
+      <h3>¿En Odoo, el costo lo cargás con IVA o sin IVA?</h3>
+      <p class="gris" style="margin:0">Con esto la app sabe si a una lista le tiene que sumar el IVA, sacárselo o dejarla igual.</p>
+      <label class="opcion"><input type="radio" name="costo_iva" value="con" {{ '' if costo_sin_iva else 'checked' }}>
+        <span><b>Con IVA</b>: el costo es lo que le pago al proveedor, impuestos incluidos.</span></label>
+      <label class="opcion"><input type="radio" name="costo_iva" value="sin" {{ 'checked' if costo_sin_iva }}>
+        <span><b>Sin IVA</b>: cargo el precio neto y Odoo suma los impuestos.</span></label>
+    </div>
+  </div>
+
+  <div class="caja paso">
+    <div class="num">3</div>
+    <div>
       <h3>¿Quiénes son tus proveedores?</h3>
       <p class="gris" style="margin:0">Uno por línea. Si alguno tiene sigla o apodo, ponelo después de un guion:
         <code>Cooperativa Agrícola del Sur - CAS</code>. Si te olvidás de alguno, lo escribís cuando cargues su mensaje o
@@ -34,7 +46,7 @@ tres cosas de tu negocio. Todo se puede cambiar después.</p>
   </div>
 
   <div class="caja paso">
-    <div class="num">3</div>
+    <div class="num">4</div>
     <div>
       <h3>¿Anotás los mensajes de los proveedores en una planilla de Google?</h3>
       <p class="gris" style="margin:0">Opcional. Si la usás, pegá el link: la app la lee con un clic. Tiene que tener una pestaña

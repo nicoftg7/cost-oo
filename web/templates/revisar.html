@@ -119,7 +119,7 @@ Cada costo dice de qué mensaje o lista salió.</p>
 
   {% elif t.tipo_tarjeta == 'iva' %}
     <div><b>{{ t.nombre_odoo }}</b></div>
-    <p style="margin:6px 0">Precio de lista sin IVA: <b>{{ t.precio_lista|pesos }}</b>{% if t.percepcion|vacio and t.percepcion > 0 %}
+    <p style="margin:6px 0">Precio de lista {{ 'con' if t.iva_incluido else 'sin' }} IVA: <b>{{ t.precio_lista|pesos }}</b>{% if t.percepcion|vacio and t.percepcion > 0 %}
       <span class="gris">(se suma también {{ (t.percepcion * 100)|round(1)|replace('.0', '') }}% de percepción)</span>{% endif %}.
       Costo en Odoo hoy: {{ t.costo_actual|pesos }}.</p>
     <p class="gris" style="margin:0">¿Qué IVA lleva este producto? Se guarda: no se vuelve a preguntar.</p>

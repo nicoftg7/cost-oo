@@ -212,6 +212,29 @@ def test_tarjeta_de_iva_guarda_el_del_producto(cliente):
     assert res["listos"].iloc[0]["costo_nuevo"] == pytest.approx(3315.0)
 
 
+def test_negocio_que_carga_el_costo_sin_iva(cliente):
+    modulo, c = cliente
+    assert not modulo.memoria.costo_sin_iva()
+    c.post("/bienvenida", data={"negocio": "Almacén", "costo_iva": "sin", "proveedores": "", "url": ""},
+           content_type="multipart/form-data")
+    assert modulo.memoria.costo_sin_iva()
+    assert "value=\"sin\" checked" in c.get("/bienvenida").get_data(as_text=True)
+    buf = io.BytesIO()
+    export_df().to_csv(buf, index=False)
+    c.post("/export", data={"export": (io.BytesIO(buf.getvalue()), "export.csv")},
+           content_type="multipart/form-data")
+    modulo.memoria.fijar_iva("Distribuidora Uno", "incluido-mixto")
+    modulo.memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "PAS001")
+    lista = "Codigo;Descripcion;Precio\nAL-0100;FIDEOS NATURALES PASTAS RIO 500 GR;3315,00\n"
+    c.post("/fuente/listas", data={"proveedor": "Distribuidora Uno", "iva": "",
+                                   "listas": (io.BytesIO(lista.encode()), "lista.csv")},
+           content_type="multipart/form-data")
+    pagina = c.get("/revisar").get_data(as_text=True)
+    assert "qué IVA sacarle" in pagina and "Precio de lista con IVA" in pagina
+    assert "IVA 10,5% → costo $ 3.000" in pagina.replace("\xa0", " ")
+    assert "carga el costo <b>sin IVA</b>" in c.get("/memoria").get_data(as_text=True)
+
+
 def test_elegir_producto_aprende_alias(cliente):
     modulo, c = cliente
     subir(c, export_df(), 'Proveedor,Chequeado,Mensaje\n"Pastas Río",TRUE,"Los de la casa $3800"\n')

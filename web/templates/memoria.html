@@ -18,7 +18,10 @@ pregunta menos. Si te equivocaste en una confirmación, borrala y la app vuelve 
 <h2 id="proveedores">🤝 Proveedores ({{ proveedores|length }})</h2>
 {% if guardado %}<div class="aviso">✓ Cambios guardados.</div>{% endif %}
 <p class="gris" style="margin-top:-6px">Los que aparecen para elegir al cargar un mensaje o una lista. Cuando escribís uno nuevo
-  al cargar algo, se agrega solo. “Otros nombres” sirve para apodos o siglas (por ejemplo, las siglas de una cooperativa), separados por |.</p>
+  al cargar algo, se agrega solo. “Otros nombres” sirve para apodos o siglas (por ejemplo, las siglas de una cooperativa), separados por |.
+  <b>IVA de sus listas</b> dice cómo vienen sus precios. Tu negocio carga el costo <b>{{ 'sin' if costo_sin_iva else 'con' }} IVA</b>
+  ({{ 'a las listas con IVA se les saca' if costo_sin_iva else 'a las listas sin IVA se les suma' }};
+  <a href="{{ url_for('bienvenida') }}">cambiar</a>).</p>
 <details class="caja" {% if abrir_proveedores %}open{% endif %}>
   <summary>Ver y editar</summary>
   <p class="gris">Cambiá todo lo que necesites y tocá <b>Guardar cambios</b> una sola vez, al final.

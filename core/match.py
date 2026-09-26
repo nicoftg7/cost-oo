@@ -39,6 +39,7 @@ class Contexto:
         self.ignorar = memoria.ignorar()
         self.reglas = memoria.leer("reglas_proveedor")
         self.impuestos = memoria.impuestos()
+        self.costo_sin_iva = memoria.costo_sin_iva()
         self.idx = indice_proveedores(catalogo, memoria.leer("proveedor_alias"))
         self._sub = {}
         self._alias_sub = {}
@@ -258,7 +259,7 @@ def analizar_renglon(f, ctx, umbral_auto=UMBRAL_AUTO, umbral_dudoso=UMBRAL_DUDOS
                 "score": round(score), "via": via, **_datos_producto(fila),
                 "desajuste": desajuste_tamano(desc, fila.nombre_completo)})
     if f["tipo"] == "costo":
-        transform.aplicar(reg, f["costo_nuevo"], prov, fila, ctx.impuestos, ctx.reglas)
+        transform.aplicar(reg, f["costo_nuevo"], prov, fila, ctx.impuestos, ctx.reglas, ctx.costo_sin_iva)
         if fila.costo_actual and not reg.get("falta_iva"):
             nuevo = reg["costo_nuevo"]
             reg["variacion_%"] = round((nuevo / fila.costo_actual - 1) * 100, 1)
@@ -384,7 +385,7 @@ def analizar_articulo(a, ctx, distribuidor, codigos, marcas_conocidas=(), unidad
         precio = round(precio / n, 4)
         reg.update({"costo_nuevo": precio, "precio_bulto": a["precio"], "unidades_bulto": n, "desajuste": "",
                     "via": f"{reg['via']} · precio del bulto de {n}"})
-    transform.aplicar(reg, precio, [marca, distribuidor], fila, ctx.impuestos, ctx.reglas)
+    transform.aplicar(reg, precio, [marca, distribuidor], fila, ctx.impuestos, ctx.reglas, ctx.costo_sin_iva)
     if fila.costo_actual and not reg.get("falta_iva"):
         reg["variacion_%"] = round((reg["costo_nuevo"] / fila.costo_actual - 1) * 100, 1)
         if abs(reg["costo_nuevo"] - fila.costo_actual) < 0.01:
@@ -393,7 +394,8 @@ def analizar_articulo(a, ctx, distribuidor, codigos, marcas_conocidas=(), unidad
             _sugerir_bulto(reg, base["descripcion"], fila.costo_actual, reg["costo_nuevo"])
     elif fila.costo_actual and not n:
         # todavía falta el IVA: se estima con el sugerido, así la tarjeta del IVA ya avisa del bulto
-        estimado = precio * (1 + reg["iva_sugerido"]) * (1 + reg.get("percepcion", 0))
+        estimado = transform.costo_de_lista(precio, reg["iva_sugerido"], reg.get("percepcion", 0),
+                                            reg["iva_incluido"], ctx.costo_sin_iva)
         _sugerir_bulto(reg, base["descripcion"], fila.costo_actual, estimado)
     return [reg]
 

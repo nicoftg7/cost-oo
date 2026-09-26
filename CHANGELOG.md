@@ -356,6 +356,23 @@ download (with Linux ones, `cmd.exe` can fail to find the labels its `goto` jump
 operator guide now starts with how to download the app at all — including not running it from
 inside the ZIP, where Windows would use a temporary folder and everything it learned would be lost.
 
+## Phase 14 — Businesses that load costs without VAT
+
+The first real use of the public download, by a second business, found an assumption baked in
+since Phase 1: that the cost in Odoo always includes VAT. The original buying club sells at a
+final price, so the app only ever *added* VAT to lists that came without it. Plenty of
+businesses do the opposite — they load the net cost and let Odoo add the taxes — and for them
+a list with VAT included has to have it *taken out*, which the app couldn't do.
+
+Now the business says once, on the welcome screen, whether its Odoo cost goes with or without
+VAT, and each supplier's list says how its prices come. The app does the arithmetic from both:
+add VAT, remove it, or leave the price alone. Removing it needs to know the rate, so there's a
+new option for lists that include VAT at mixed rates (21% or 10.5% by product); the per-product
+question appears only when the rate actually matters. A net cost also leaves out the 3%
+perception, which is a tax credit rather than a cost. Suppliers saved as "VAT included" before
+this change had no tax rule on file (there used to be nothing to add), so they're read from the
+supplier sheet — switching the business to net costs works without re-entering anything.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

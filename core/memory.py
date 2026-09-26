@@ -29,8 +29,9 @@ ESQUEMAS = {
     "rotaciones": ["grupo", "referencia", "proveedor", "nota"],
     # quién cotiza por kilo, quién sin IVA
     "reglas_proveedor": ["proveedor", "cotiza_por", "iva", "nota"],
-    # impuestos a sumar: ambito = proveedor | referencia
-    "impuestos": ["ambito", "clave", "iva", "percepcion", "nota"],
+    # impuestos de las listas: ambito = proveedor | referencia. incluido = "si" cuando los
+    # precios ya traen el IVA
+    "impuestos": ["ambito", "clave", "iva", "percepcion", "nota", "incluido"],
     # cada costo que se mandó a Odoo, con de dónde salió. La última fila de cada
     # producto dice a quién se le compra ("fuente habitual").
     # estado = generado | verificado | no se aplicó
@@ -39,13 +40,15 @@ ESQUEMAS = {
     # mensajes y listas ya procesados: si vuelve el mismo texto, no es un precio nuevo
     "procesados": ["fuente", "huella", "fecha", "origen"],
     # los proveedores con los que se trabaja. tipo = mensaje | lista | manual.
-    # iva_lista = incluido | 21 | 21+3 (qué hay que sumarle a sus listas). alias separados por |
+    # iva_lista = una clave de IVA_OPCIONES (cómo vienen sus precios). alias separados por |
     # margen = fijo (el precio de venta sigue al costo) | variable (se revisa contra el precio actual)
     "proveedores": ["nombre", "alias", "tipo", "iva_lista", "margen", "nota"],
     # jerga y abreviaturas propias del negocio ("bahi" = "bahia"; significa vacío = borrar la palabra)
     "abreviaturas": ["texto", "significa", "nota"],
     # filas del export de Odoo que no son productos (cuotas, bonos, tareas internas)
     "no_son_productos": ["empieza_con", "nota"],
+    # cómo trabaja el negocio. costo_sin_iva = si: en Odoo el costo va sin IVA
+    "ajustes": ["clave", "valor"],
 }
 
 
@@ -111,9 +114,19 @@ class Memoria:
         return g
 
     def impuestos(self):
-        """iva queda en None cuando depende del producto (proveedor "mixto")."""
+        """por_producto: el IVA depende del producto (proveedor "mixto")."""
         imp = self.leer("impuestos")
+        # antes "con IVA incluido" no dejaba regla (no había nada que sumar): se arma de la ficha
+        tiene = set(imp.loc[imp["ambito"] == "proveedor", "clave"].map(normalizar))
+        viejos = [{"ambito": "proveedor", "clave": r.nombre, "iva": f"{t[0]:g}" if isinstance(t[0], float) else t[0],
+                   "percepcion": "0", "nota": "según la ficha del proveedor", "incluido": "si"}
+                  for r in self.leer("proveedores").itertuples()
+                  if str(r.iva_lista).startswith("incluido") and normalizar(r.nombre) not in tiene
+                  and (t := tasas_de_opcion(r.iva_lista))]
+        if viejos:
+            imp = pd.concat([imp, pd.DataFrame(viejos)], ignore_index=True)
         imp["por_producto"] = imp["iva"].eq(IVA_POR_PRODUCTO)
+        imp["incluido"] = imp["incluido"].eq("si")
         for c in ("iva", "percepcion"):
             imp[c] = pd.to_numeric(imp[c], errors="coerce").fillna(0.0)
         return imp
@@ -255,7 +268,8 @@ class Memoria:
         if tasas:
             imp = pd.concat([imp, pd.DataFrame([{
                 "ambito": "proveedor", "clave": nombre, "iva": f"{tasas[0]:g}" if isinstance(tasas[0], float) else tasas[0],
-                "percepcion": f"{tasas[1]:g}", "nota": "según la ficha del proveedor"}])],
+                "percepcion": f"{tasas[1]:g}", "nota": "según la ficha del proveedor",
+                "incluido": "si" if tasas[2] else ""}])],
                 ignore_index=True)
         self.guardar("impuestos", imp)
 
@@ -275,6 +289,18 @@ class Memoria:
 
     def nombres_proveedores(self):
         return sorted(self.leer("proveedores")["nombre"].tolist(), key=str.lower)
+
+    def costo_sin_iva(self):
+        """True si el negocio carga el costo en Odoo sin IVA (y Odoo lo suma después)."""
+        a = self.leer("ajustes")
+        return bool(len(a[(a["clave"] == "costo_sin_iva") & (a["valor"] == "si")]))
+
+    def fijar_costo_sin_iva(self, sin_iva):
+        a = self.leer("ajustes")
+        a = pd.concat([a[a["clave"] != "costo_sin_iva"],
+                       pd.DataFrame([{"clave": "costo_sin_iva", "valor": "si" if sin_iva else "no"}])],
+                      ignore_index=True)
+        self.guardar("ajustes", a)
 
     def conteos(self):
         return {n: len(self.leer(n)) for n in ESQUEMAS}

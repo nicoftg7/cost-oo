@@ -6,11 +6,13 @@ from .normalize import sin_acentos
 
 PAIS = "Argentina"
 
-# Qué hay que sumarle a la lista de un proveedor para llegar al costo.
+# Cómo vienen los precios de la lista de un proveedor. Con eso y con cómo carga el negocio el
+# costo en Odoo (con IVA o sin IVA) se sabe si hay que sumar el IVA, sacarlo o dejarlo igual.
 IVA_OPCIONES = {
-    "incluido": "No sumar nada: es el precio final",
-    "21": "Sin IVA: sumar 21%",
-    "21+3": "Sin IVA: sumar 21% + 3% de percepción",
+    "incluido": "Con IVA incluido (21%)",
+    "incluido-mixto": "Con IVA incluido: 21% o 10,5% según el producto",
+    "21": "Sin IVA (21%)",
+    "21+3": "Sin IVA (21%) + 3% de percepción",
     "mixto": "Sin IVA: 21% o 10,5% según el producto",
     "mixto+3": "Sin IVA: 21% o 10,5% según el producto, + 3% de percepción",
 }
@@ -23,11 +25,12 @@ IVA_POR_PRODUCTO = "según producto"
 
 
 def tasas_de_opcion(valor):
-    """'21+3' -> (0.21, 0.03); 'mixto' -> (IVA_POR_PRODUCTO, 0.0); 'incluido' -> None."""
-    if valor == "incluido" or valor not in IVA_OPCIONES:
+    """'21+3' -> (0.21, 0.03, False); 'mixto' -> (IVA_POR_PRODUCTO, 0.0, False);
+    'incluido' -> (0.21, 0.0, True). El último valor dice si el precio ya trae el IVA."""
+    if valor not in IVA_OPCIONES:
         return None
-    iva = IVA_POR_PRODUCTO if valor.startswith("mixto") else IVA_GENERAL
-    return iva, PERCEPCION if valor.endswith("+3") else 0.0
+    iva = IVA_POR_PRODUCTO if "mixto" in valor else IVA_GENERAL
+    return iva, PERCEPCION if valor.endswith("+3") else 0.0, valor.startswith("incluido")
 
 
 # Alícuota reducida (10,5%): harina, pan, carnes, frutas y verduras frescas, etc.
