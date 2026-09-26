@@ -8,7 +8,7 @@ Odoo pueda usarlo.
 
 ## 1. El problema
 
-Un club de compras con ~500 productos en Odoo y ~140 proveedores actualiza costos cada
+Un club de compras con ~500 productos en Odoo y ~70 proveedores actualiza costos cada
 mes. Los proveedores mandan precios de seis formas distintas: mensajes de WhatsApp,
 planillas, PDFs, tablas pegadas, capturas del sistema del proveedor, y listas mayoristas
 de varias páginas. Nadie manda un CSV limpio.

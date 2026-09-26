@@ -7,7 +7,7 @@
 
 **Your suppliers send prices over WhatsApp, and someone types them into Odoo by hand.**
 
-A buying club with ~500 products and ~140 small suppliers updates costs every month. Prices
+A buying club with ~500 products and ~70 small suppliers updates costs every month. Prices
 arrive as chat messages, spreadsheets, PDFs, pasted tables, screenshots of the supplier's
 invoicing system and multi-page wholesale lists. Nobody sends a clean CSV. Doing it by hand
 takes hours, and the mistakes are silent: a wrong cost breaks nothing, you just sell at a lower

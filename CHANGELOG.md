@@ -5,7 +5,7 @@ solved them. Each entry exists because something real broke, was confusing, or w
 
 ## Phase 0 — The problem
 
-A buying club with ~500 products and ~140 small suppliers updates its costs in Odoo every
+A buying club with ~500 products and ~70 small suppliers updates its costs in Odoo every
 month. Suppliers send prices however they send them: WhatsApp messages, spreadsheets, PDF
 price lists, pasted tables, photos of a handwritten flyer, screenshots of their own invoicing
 system. Nobody sends a clean CSV. Someone read every message and typed every cost into Odoo
