@@ -217,7 +217,7 @@ function buscar(nombre) {
     return [p.nombre].concat(p.alias).some(function (a) { return normal(a) === k; });
   });
 }
-// el nombre del archivo suele decir de quién es ("LISTA REGIONAL TRADE ..."): se propone, y se ve
+// el nombre del archivo suele decir de quién es ("LISTA DISTRIBUIDORA NORTE ..."): se propone, y se ve
 function adivinar(archivo) {
   var palabras = ' ' + normal(archivo.replace(/\.[a-z]+$/i, '')) + ' ';
   var mejor = null, largo = 0;

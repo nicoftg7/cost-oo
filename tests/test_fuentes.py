@@ -165,13 +165,13 @@ def test_sin_stock_de_algo_que_se_compra_es_un_aviso(catalogo, memoria):
 
 # ---------- ficha de proveedores ----------
 def test_proveedor_nuevo_queda_guardado_y_se_reconoce(memoria):
-    assert memoria.registrar_proveedor("Regional  Trade", tipo="lista") == "Regional Trade"
-    assert memoria.registrar_proveedor("regional trade") == "Regional Trade"
-    assert memoria.nombres_proveedores() == ["Regional Trade"]
+    assert memoria.registrar_proveedor("Distribuidora  Norte", tipo="lista") == "Distribuidora Norte"
+    assert memoria.registrar_proveedor("distribuidora norte") == "Distribuidora Norte"
+    assert memoria.nombres_proveedores() == ["Distribuidora Norte"]
     df = memoria.leer("proveedores")
-    df.loc[0, "alias"] = "RT|Regional"
+    df.loc[0, "alias"] = "DN|Norte"
     memoria.guardar("proveedores", df)
-    assert memoria.buscar_proveedor("RT") == "Regional Trade"
+    assert memoria.buscar_proveedor("DN") == "Distribuidora Norte"
 
 
 def test_iva_de_la_ficha_se_aplica(catalogo, memoria):
