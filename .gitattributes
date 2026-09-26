@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# cmd.exe puede leer mal un .bat con finales de línea de Linux (saltos con goto que no
+# encuentran su etiqueta): se guardan y se descargan siempre con los de Windows
+*.bat text eol=crlf

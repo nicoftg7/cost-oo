@@ -547,3 +547,21 @@ def test_verificacion_todo_bien():
                              "name": ["a"], "standard_price": [3600.0]})
     v = verificar(esperado, antes, construir(df))
     assert v["todo_bien"] and len(v["otros_cambios"]) == 0
+
+
+def test_lista_en_foto_se_lee_con_ocr():
+    """El paquete de OCR anterior no se instalaba en Python 3.13 o más nuevo, y como se
+    instala junto con todo lo demás, la app entera no arrancaba para quien bajara Python
+    hoy. Este test lee una foto de lista de punta a punta (se saltea si no hay OCR)."""
+    pytest.importorskip("rapidocr")
+    from PIL import Image, ImageDraw, ImageFont
+    from core.ocr import texto_de_imagen
+    img = Image.new("RGB", (900, 260), "white")
+    dibujo, fuente = ImageDraw.Draw(img), ImageFont.load_default(size=34)
+    for i, linea in enumerate(["Yerba mate 1 kg ...... $2500", "Harina 000 1 kg ...... $900"]):
+        dibujo.text((40, 40 + i * 90), linea, fill="black", font=fuente)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    texto = texto_de_imagen(buf.getvalue())
+    assert "$2500" in texto and "$900" in texto
+    assert "Yerba" in texto and "Harina" in texto

@@ -15,7 +15,9 @@ def _ocr():
     global _motor
     if _motor is None:
         try:
-            from rapidocr_onnxruntime import RapidOCR
+            # "rapidocr", no el viejo "rapidocr_onnxruntime": ese no se instala en Python 3.13
+            # o más nuevo, y la instalación entera fallaba para quien bajaba Python hoy
+            from rapidocr import RapidOCR
         except ImportError:
             raise ErrorDeDatos("Para leer fotos falta instalar el lector de imágenes. Cerrá la app y "
                                "volvé a abrirla con \"Abrir actualizador\": se instala solo.")
@@ -47,7 +49,8 @@ def corregir(linea):
 
 
 def _leer(imagen):
-    cajas, _ = _ocr()(imagen)
+    r = _ocr()(imagen)
+    cajas = [] if r.boxes is None else list(zip(r.boxes, r.txts, r.scores))
     return "\n".join(corregir(l) for l in _renglones(cajas))
 
 
