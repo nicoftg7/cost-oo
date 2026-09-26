@@ -125,6 +125,22 @@ class Memoria:
                   and (t := tasas_de_opcion(r.iva_lista))]
         if viejos:
             imp = pd.concat([imp, pd.DataFrame(viejos)], ignore_index=True)
+        # la regla vale también con los otros nombres del proveedor: la planilla dice "La
+        # Quesera" pero el precio llega como "Lácteos Don Julio" (su nombre en Odoo)
+        grupos = [[r.alias, r.proveedor] for r in self.leer("proveedor_alias").itertuples()]
+        grupos += [[r.nombre] + [x.strip() for x in str(r.alias).split("|") if x.strip()]
+                   for r in self.leer("proveedores").itertuples()]
+        reglas = imp[imp["ambito"] == "proveedor"]
+        tiene = set(reglas["clave"].map(normalizar))
+        extra = []
+        for g in grupos:
+            r = next((r for r in reglas.itertuples() if normalizar(r.clave) in {normalizar(x) for x in g}), None)
+            for otro in g if r is not None else []:
+                if normalizar(otro) not in tiene:
+                    extra.append({**r._asdict(), "clave": otro})
+                    tiene.add(normalizar(otro))
+        if extra:
+            imp = pd.concat([imp, pd.DataFrame(extra).drop(columns="Index")], ignore_index=True)
         imp["por_producto"] = imp["iva"].eq(IVA_POR_PRODUCTO)
         imp["incluido"] = imp["incluido"].eq("si")
         for c in ("iva", "percepcion"):
@@ -252,6 +268,11 @@ class Memoria:
         df = self.leer("proveedores")
         f = df[df["nombre"] == (self.buscar_proveedor(proveedor) or proveedor)]
         return f.iloc[0]["iva_lista"] if len(f) else ""
+
+    def sabe_iva(self, proveedor):
+        """Si ya se sabe cómo cotiza este proveedor (con o sin IVA), por su ficha o por impuestos.csv."""
+        from .transform import impuesto_de
+        return bool(self.iva_de(proveedor)) or impuesto_de([proveedor], "", self.impuestos()) is not None
 
     def fijar_iva(self, proveedor, valor):
         """Qué hay que sumarle a las listas de este proveedor. Se guarda en la ficha del

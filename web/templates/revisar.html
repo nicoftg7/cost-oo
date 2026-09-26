@@ -74,14 +74,31 @@ Cada costo dice de qué mensaje o lista salió.</p>
 
 <div class="resumen">
   <a href="#listos"><div class="cifra verde"><b>{{ listos|length }}</b>✅ listos para importar</div></a>
-  <a href="#confirmar"><div class="cifra ambar"><b>{{ tarjetas|length }}</b>👀 para confirmar</div></a>
+  <a href="#confirmar"><div class="cifra ambar"><b>{{ tarjetas|length + iva_proveedores|length }}</b>👀 para confirmar</div></a>
   <div class="cifra"><b>{{ sin_cambio }}</b>✔️ ya tienen el costo correcto</div>
   <a href="#avisos"><div class="cifra"><b>{{ faltantes|length + notas|length + rotacion|length }}</b>🔔 avisos</div></a>
 </div>
 
 <h2 id="confirmar">👀 Para confirmar</h2>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
-{% if not tarjetas %}
+{% for p in iva_proveedores %}
+<div class="tarjeta" id="iva-{{ loop.index }}">
+  <div class="arriba">
+    <span class="chip">{{ p.proveedor }}</span>
+    <span class="porque">¿Los precios de {{ p.proveedor }} incluyen IVA?</span>
+  </div>
+  <p style="margin:6px 0">Mandó {{ p.cantidad }} precio{{ 's' if p.cantidad != 1 }}. Hasta saber esto no entran al archivo,
+    porque el costo puede quedar mal por el IVA. Se pregunta una sola vez: queda guardado en su ficha.</p>
+  <div class="mensaje">{% for l in p.ejemplos %}{{ l }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% if p.cantidad > 3 %}<br>…{% endif %}</div>
+  <form action="{{ url_for('iva_proveedor') }}" method="post" class="fila-form">
+    <input type="hidden" name="proveedor" value="{{ p.proveedor }}">
+    <select name="iva" required><option value="">Elegí cómo vienen sus precios</option>
+      {% for v, t in iva_opciones.items() %}<option value="{{ v }}">{{ t }}</option>{% endfor %}</select>
+    <button class="boton verde" type="submit">✓ Guardar</button>
+  </form>
+</div>
+{% endfor %}
+{% if not tarjetas and not iva_proveedores %}
 <div class="caja">🎉 No queda nada por confirmar.</div>
 {% endif %}
 {% for t in tarjetas %}

@@ -373,6 +373,17 @@ perception, which is a tax credit rather than a cost. Suppliers saved as "VAT in
 this change had no tax rule on file (there used to be nothing to add), so they're read from the
 supplier sheet — switching the business to net costs works without re-entering anything.
 
+Then the same question was asked everywhere a price can come in. Before, only a price list
+asked whether it included VAT; a WhatsApp message or a row of the shared spreadsheet from a
+supplier nobody had configured was taken as-is — silently wrong for any supplier quoting net
+prices. Now the message form asks too, and anything from a supplier whose VAT is unknown is held
+back from the import file and asked once per supplier at the top of the review. That includes
+prices equal to today's cost, which only mean "no change" if they already carried VAT. Checking
+this turned up two quieter bugs: supplier names were matched loosely enough that "Distribuidora
+Dos" inherited "Distribuidora Uno"'s VAT setting, and a supplier known by a nickname in the
+spreadsheet lost its setting once its name was translated to the Odoo one. And on a list, VAT
+now comes only from the distributor that sent it, never from a brand printed inside it.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

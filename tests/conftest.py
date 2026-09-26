@@ -43,9 +43,25 @@ def catalogo():
     return construir(export_df())
 
 
+# Los proveedores del catálogo de prueba ya dijeron cómo cotizan (con IVA incluido): sin
+# eso sus costos quedan esperando la respuesta. Va directo a impuestos.csv, sin ficha, para
+# no cambiar nada más (una instalación sin proveedores en la ficha pasa por la bienvenida).
+PROVEEDORES_CON_IVA = ["Panadería Norte", "Dulces del Sur", "Pastas Río", "Embutidos Sierra",
+                       "Especias Luna", "Limpieza Clara"]
+
+
+def con_iva_conocido(memoria):
+    imp = memoria.leer("impuestos")
+    imp = pd.concat([imp, pd.DataFrame([{"ambito": "proveedor", "clave": p, "iva": "0.21", "percepcion": "0",
+                                         "nota": "", "incluido": "si"} for p in PROVEEDORES_CON_IVA])],
+                    ignore_index=True)
+    memoria.guardar("impuestos", imp)
+    return memoria
+
+
 @pytest.fixture
 def memoria(tmp_path):
-    return Memoria(tmp_path / "memoria")
+    return con_iva_conocido(Memoria(tmp_path / "memoria"))
 
 
 @pytest.fixture

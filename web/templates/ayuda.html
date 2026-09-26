@@ -58,7 +58,8 @@ encuentra cada producto en Odoo y arma un archivo para importar los costos nuevo
   por los que se parecen a algo del catálogo. El resto queda en una lista aparte, sin preguntar.</p>
   <p>La primera vez confirmás qué artículo es cada producto. La app aprende el <b>código</b> de la distribuidora
   (por ejemplo AL-0014) y desde la próxima lista esos productos entran solos, aunque la descripción cambie.</p>
-  <p>La primera vez que cargás la lista de un proveedor te pregunta si los precios incluyen IVA. Queda guardado en su ficha
+  <p>La primera vez que cargás una lista o un mensaje de un proveedor, la app pregunta si los precios incluyen IVA. Lo que llega
+  por la planilla se pregunta en la revisión, una vez por proveedor: hasta que respondas, sus precios no entran al archivo. Queda guardado en su ficha
   (en <a href="{{ url_for('ver_memoria') }}#proveedores">Lo aprendido → Proveedores</a>) y no vuelve a preguntar.</p>
   <p>Con eso y con cómo cargás el costo en Odoo (con IVA o sin IVA, en <a href="{{ url_for('bienvenida') }}">datos del negocio</a>)
   la app hace la cuenta: si tu costo va con IVA y la lista viene sin IVA, se lo suma; si tu costo va sin IVA y la lista viene

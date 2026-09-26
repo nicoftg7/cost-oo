@@ -20,14 +20,18 @@ def impuesto_de(proveedores, referencia, imp):
         return None
     reglas = list(imp[imp.ambito == "proveedor"].itertuples())
     objs = [normalizar(p) for p in ([proveedores] if isinstance(proveedores, str) else proveedores) if p]
-    prov = next((r for o in objs for r in reglas if fuzz.token_set_ratio(o, normalizar(r.clave)) >= 88), None)
+    # mismo criterio que la ficha de proveedores: con token_set, "Distribuidora Dos" se
+    # quedaba con el IVA de "Distribuidora Uno" (88 puntos). Los otros nombres del proveedor
+    # ya vienen como reglas propias (Memoria.impuestos)
+    prov = next((r for o in objs for r in reglas
+                 if o == normalizar(r.clave) or fuzz.token_sort_ratio(o, normalizar(r.clave)) >= 93), None)
+    if prov is None:
+        return None
     incluido = bool(getattr(prov, "incluido", False))
     porref = imp[(imp.ambito == "referencia") & (imp.clave.astype(str) == str(referencia))]
     if len(porref):
         r = porref.iloc[0]
         return float(r.iva), float(r.percepcion), incluido
-    if prov is None:
-        return None
     if getattr(prov, "por_producto", False):
         return POR_PRODUCTO, float(prov.percepcion), incluido
     return float(prov.iva), float(prov.percepcion), incluido
@@ -75,12 +79,19 @@ def por_kilo(precio_kilo, nombre_odoo):
 def aplicar(reg, costo_mensaje, proveedor, fila, impuestos, reglas, costo_sin_iva=False):
     """Aplica impuestos y regla por kilo sobre un renglón ya matcheado (lo modifica).
 
-    proveedor: un nombre, o varios en orden de preferencia (marca, distribuidora): la
-    primera regla que aparezca es la que vale. costo_sin_iva: el negocio carga el costo
+    proveedor: un nombre, o varios (marca, distribuidora). Para cotizar por kilo vale la
+    primera regla que aparezca; para el IVA, solo la de la distribuidora. costo_sin_iva: el negocio carga el costo
     sin IVA, así que a una lista con IVA se le saca en vez de sumárselo a una sin IVA."""
     provs = [p for p in ([proveedor] if isinstance(proveedor, str) else proveedor) if p]
     via = reg["via"]
-    tas = impuesto_de(provs, fila.referencia, impuestos)
+    # el IVA es de la lista o del mensaje: lo dice quien manda el precio (el último: la
+    # distribuidora, no la marca), y solo él. Si no se sabe, se pregunta
+    tas = impuesto_de(provs[-1:], fila.referencia, impuestos)
+    if tas is None and provs:
+        # no se sabe si este proveedor cotiza con o sin IVA: el costo no entra hasta
+        # saberlo. Se pregunta una vez por proveedor (el que manda el precio: el último)
+        reg.update({"falta_iva_proveedor": True, "proveedor_iva": provs[-1], "precio_lista": costo_mensaje,
+                    "via": f"{via} · falta saber si {provs[-1]} cotiza con o sin IVA"})
     if tas and tas[0] == POR_PRODUCTO and hace_falta_alicuota(tas[2], costo_sin_iva):
         # sin saber el IVA de este producto el costo no se puede calcular: se pregunta una vez
         reg.update({"falta_iva": True, "percepcion": 0.0 if costo_sin_iva else tas[1],

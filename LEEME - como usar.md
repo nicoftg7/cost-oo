@@ -42,7 +42,10 @@ datos, otro puerto). Tocá *Cargar el ejemplo y analizar*, respondé lo que preg
      una. La primera vez pregunta si la lista incluye IVA; después ya lo sabe. Si en Odoo
      cargás el costo sin IVA, decilo en *Lo aprendido → datos del negocio*: a las listas con IVA
      se les saca, en vez de sumárselo a las que vienen sin.
-   - **Mensaje suelto**: elegís el proveedor y pegás el mensaje.
+   - **Mensaje suelto**: elegís el proveedor y pegás el mensaje. Si es la primera vez, también si
+     el precio incluye IVA.
+   - Si un proveedor de la planilla todavía no dijo si cotiza con o sin IVA, la revisión lo pregunta
+     arriba de todo, una vez por proveedor. Hasta que respondas, sus precios no entran al archivo.
    - Si un proveedor no está en la lista para elegir, escribí su nombre: queda guardado.
 3. **Analizá y confirmá lo amarillo.** Son los casos en que la app no está segura.
 4. **Mirá la lista final.** Lo raro aparece arriba, en amarillo: aumentos grandes, costos por encima

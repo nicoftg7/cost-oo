@@ -168,14 +168,14 @@ def memoria():
     m.mkdir(exist_ok=True)
     tablas = {
         "proveedores": (["nombre", "alias", "tipo", "iva_lista", "margen", "nota"], [
-            ("Panadería La Espiga", "", "mensaje", "", "fijo", ""),
-            ("Pastas Río", "", "mensaje", "", "fijo", ""),
-            ("La Quesera", "", "mensaje", "", "fijo", "en Odoo figura como Lácteos Don Julio"),
-            ("Especias Luna", "", "mensaje", "", "fijo", ""),
-            ("Miel del Monte", "", "mensaje", "", "fijo", ""),
-            ("Embutidos La Sierra", "", "mensaje", "", "fijo", ""),
-            ("Limpieza Clara", "", "mensaje", "", "fijo", ""),
-            ("Verdulería Don Tito", "", "manual", "", "fijo", ""),
+            ("Panadería La Espiga", "", "mensaje", "incluido", "fijo", ""),
+            ("Pastas Río", "", "mensaje", "incluido", "fijo", ""),
+            ("La Quesera", "", "mensaje", "incluido", "fijo", "en Odoo figura como Lácteos Don Julio"),
+            ("Especias Luna", "", "mensaje", "incluido", "fijo", ""),
+            ("Miel del Monte", "", "mensaje", "incluido", "fijo", ""),
+            ("Embutidos La Sierra", "", "mensaje", "incluido", "fijo", ""),
+            ("Limpieza Clara", "", "mensaje", "incluido", "fijo", ""),
+            ("Verdulería Don Tito", "", "manual", "incluido", "fijo", ""),
             ("Distribuidora Norte", "DN", "lista", "21", "fijo", ""),
             ("Distribuidora Sur", "", "lista", "mixto", "fijo", "harina al 10,5%, el resto al 21%"),
         ]),

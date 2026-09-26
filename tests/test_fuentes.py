@@ -103,6 +103,7 @@ def test_marca_del_titulo_de_la_seccion():
 
 # ---------- listas en un ciclo ----------
 def test_lista_primera_vez_pregunta_y_despues_entra_sola(catalogo, memoria):
+    memoria.fijar_iva("Distribuidora Uno", "incluido")
     f = lista("Distribuidora Uno", "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3650.000 20",
               "ZZ-0001 LAMPARA LED 9W 1500.000 10")
     res = correr_fuentes(catalogo, memoria, [f])
@@ -122,6 +123,7 @@ def test_lista_con_la_misma_fila_repetida_no_se_duplica(catalogo, memoria):
     dos veces, idéntico. Antes, las dos filas generaban la misma clave interna, y el cartel
     de "dos renglones al mismo producto" terminaba señalándose a sí mismo: confirmar cuál vale
     no hacía nada, porque agregar y sacar la misma clave de "salteados" se cancelaba solo."""
+    memoria.fijar_iva("Distribuidora Uno", "incluido")
     memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "PAS001")
     f = lista("Distribuidora Uno",
               "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3650.000 20",
@@ -148,6 +150,7 @@ def test_impuestos_de_la_distribuidora(catalogo, memoria):
 
 
 def test_lista_sin_marca_en_la_descripcion_usa_la_de_la_seccion(catalogo, memoria):
+    memoria.fijar_iva("Distribuidora Dos", "incluido")
     f = lista("Distribuidora Dos", "PASTAS RIO",
               "01-0001 Fideos naturales 48 x 500 grs. 4,000.00 10.00% 3,600.00")
     res = correr_fuentes(catalogo, memoria, [f])
@@ -228,8 +231,43 @@ def test_proveedor_con_iva_incluido_de_antes_tambien_se_descuenta(catalogo, memo
     assert costo_de(catalogo, memoria, f) == pytest.approx(3000.0)
 
 
+def test_el_iva_de_una_lista_lo_dice_la_distribuidora_no_la_marca(catalogo, memoria):
+    """Pastas Río manda mensajes con IVA incluido; en la lista de la distribuidora el mismo
+    fideo viene sin IVA. Manda quien arma la lista."""
+    memoria.fijar_iva("Distribuidora Uno", "21")          # Pastas Río ya viene "incluido" (conftest)
+    memoria.aprender_codigo("Distribuidora Uno", "AL-0100", "FIDEOS", "PAS001")
+    f = lista("Distribuidora Uno", "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3000.000 20")
+    assert costo_de(catalogo, memoria, f) == pytest.approx(3630.0)
+
+
+def test_proveedor_de_nombre_parecido_no_hereda_el_iva(catalogo, memoria):
+    memoria.fijar_iva("Distribuidora Uno", "incluido")
+    memoria.aprender_codigo("Distribuidora Dos", "AL-0100", "FIDEOS", "PAS001")
+    f = lista("Distribuidora Dos", "AL-0100 FIDEOS NATURALES PASTAS RIO 500 GR 3000.000 20")
+    res = correr_fuentes(catalogo, memoria, [f])
+    assert res["listos"].empty and list(res["esperan_iva"].proveedor_iva) == ["Distribuidora Dos"]
+
+
+def test_precio_igual_al_de_hoy_sin_saber_el_iva_no_se_da_por_bueno(catalogo, memoria):
+    """3500 es el costo de hoy, pero si viene sin IVA el costo real es 4235."""
+    res = correr_fuentes(catalogo, memoria, [planilla(("Granja Nueva", "TRUE", "Fideos naturales 500 g $3500"))])
+    assert res["sin_cambio"].empty and len(res["esperan_iva"]) == 1
+
+
+def test_iva_del_proveedor_vale_con_sus_otros_nombres(catalogo, memoria):
+    """En la planilla es "La Quesera"; el precio llega con su nombre de Odoo."""
+    memoria.agregar("proveedor_alias", {"alias": "La Quesera", "proveedor": "Especias Luna"})
+    imp = memoria.leer("impuestos")
+    memoria.guardar("impuestos", imp[imp.clave != "Especias Luna"])
+    memoria.fijar_iva("La Quesera", "21")
+    res = correr_fuentes(catalogo, memoria, [planilla(("La Quesera", "TRUE", "Orégano 50 g $500"))])
+    assert res["esperan_iva"].empty
+    assert res["listos"].iloc[0]["costo_nuevo"] == pytest.approx(605.0)
+
+
 def test_lista_que_cotiza_el_bulto(catalogo, memoria):
     """'10 x 500 GR $35.000' contra $3.500 en Odoo: es el bulto de 10."""
+    memoria.fijar_iva("Distribuidora Tres", "incluido")
     memoria.aprender_codigo("Distribuidora Tres", "46001", "FIDEOS", "PAS001")
     f = lista("Distribuidora Tres", "46001 FIDEOS NATURALES PASTAS RIO 10 x 500 GR 36750.000")
     c = correr_fuentes(catalogo, memoria, [f])["confirmar"].iloc[0]
@@ -335,6 +373,7 @@ def test_lista_de_un_proveedor_nuevo_sin_marca_en_el_texto_igual_pregunta(catalo
     """Negocio recién armado: sin código aprendido y sin haberle comprado nunca nada a esta
     distribuidora, la búsqueda de candidatos quedaba acotada a 'las marcas que ya se le
     compran' -> ninguna -> no buscaba en nada. Debe buscar en todo el catálogo."""
+    memoria.fijar_iva("Distribuidora Cinco", "incluido")
     f = lista("Distribuidora Cinco", "ZZ-0009 LAVANDINA CONCENTRADA 1 LITRO 900.00 20")
     res = correr_fuentes(catalogo, memoria, [f])
     assert res["fuera_de_catalogo"].empty
@@ -343,6 +382,7 @@ def test_lista_de_un_proveedor_nuevo_sin_marca_en_el_texto_igual_pregunta(catalo
 
 # ---------- fuente habitual ----------
 def test_producto_que_se_compra_a_otro_pregunta(catalogo, memoria):
+    memoria.fijar_iva("Distribuidora Uno", "incluido")
     memoria.registrar_historial([{"fecha": "2026-09-01", "referencia": "PAS001", "producto": "Fideos",
                                   "costo_anterior": 3400, "costo_nuevo": 3500, "fuente": "Pastas Río",
                                   "origen": "planilla", "linea": "", "estado": "verificado"}])

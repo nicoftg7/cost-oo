@@ -128,9 +128,12 @@ def clasificar(d, notas, cat, memoria, aprobados_ciclo=(), saltados=(), fuente_o
         for c in ("costo_actual", "variacion_%", "costo_nuevo", "score"):
             if c not in d:
                 d[c] = float("nan")
-        if "falta_iva" not in d:
-            d["falta_iva"] = False
-        d["falta_iva"] = d["falta_iva"].fillna(False).astype(bool)
+        for c in ("falta_iva", "falta_iva_proveedor"):
+            if c not in d:
+                d[c] = False
+            d[c] = d[c].fillna(False).astype(bool)
+        if "proveedor_iva" not in d:
+            d["proveedor_iva"] = ""
         if "opciones" not in d:
             d["opciones"] = [[] for _ in range(len(d))]
         d["opciones"] = d["opciones"].map(lambda o: o if isinstance(o, list) else [])
@@ -173,11 +176,17 @@ def clasificar(d, notas, cat, memoria, aprobados_ciclo=(), saltados=(), fuente_o
         # Se pregunta recién cuando se sabe qué producto es (primero el producto, después el IVA).
         costos.loc[costos["falta_iva"] & costos.estado.eq("ok"), "alerta"] = "falta IVA"
         costos.loc[costos["estado"].eq("sin match"), "alerta"] = "sin match"
+        # sin saber si el proveedor cotiza con o sin IVA ningún costo suyo es confiable: se
+        # apartan y se pregunta una vez por proveedor, antes que cualquier otra cosa
+        # (también "sin cambio": igual al costo de hoy solo si el precio ya traía el IVA)
+        esperan = costos["falta_iva_proveedor"] & ~costos.estado.eq("sin match")
+        esperan_iva = costos[esperan].assign(alerta="falta saber si el proveedor cotiza con o sin IVA")
+        costos = costos[~esperan]
         listos = costos[costos.alerta.eq("") & costos.estado.eq("ok") & ~costos["falta_iva"]]
         revisar = costos[~costos.index.isin(listos.index) & ~costos.estado.eq("sin cambio")]
         sin_cambio = costos[costos.estado.eq("sin cambio")]
     else:
-        listos = revisar = sin_cambio = costos.assign(alerta="")
+        listos = revisar = sin_cambio = esperan_iva = costos.assign(alerta="")
 
     # Red de seguridad: un mismo producto no puede entrar dos veces al import.
     # Si dos renglones apuntan al mismo producto (un proveedor cotiza "BONDIOLA" y
@@ -230,7 +239,7 @@ def clasificar(d, notas, cat, memoria, aprobados_ciclo=(), saltados=(), fuente_o
     return {"analisis": d, "listos": listos, "confirmar": revisar, "sin_cambio": sin_cambio,
             "saltados": saltados_df, "avisos": avisos, "notas": notas, "ignorados": ignorados,
             "gramajes": desaj, "nombres_corregidos": nombres, "rotacion": rot,
-            "no_mencionados": no_mencionados, "fuera_de_catalogo": fuera}
+            "no_mencionados": no_mencionados, "fuera_de_catalogo": fuera, "esperan_iva": esperan_iva}
 
 
 def control(res, margen_variable=(), umbral=UMBRAL_REVISAR_A_OJO):
@@ -345,7 +354,7 @@ def escribir_reporte(res, ruta, margen_variable=()):
         ctl = control(res, margen_variable)
         hoja(ctl, "Control", list(ctl.columns) if len(ctl) else ["producto"])
         hoja(res["listos"], "Listos", COLS_REV)
-        hoja(res["confirmar"], "Confirmar", COLS_REV + ["alerta", "alternativas"])
+        hoja(pd.concat([res["esperan_iva"], res["confirmar"]]), "Confirmar", COLS_REV + ["alerta", "alternativas"])
         hoja(res["gramajes"], "Gramajes", ["proveedor", "referencia", "descripcion", "nombre_odoo",
                                            "nombre_corregido", "aprobado", "desajuste",
                                            "costo_actual", "costo_nuevo", "linea"])

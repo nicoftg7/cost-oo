@@ -259,7 +259,11 @@ def analizar_renglon(f, ctx, umbral_auto=UMBRAL_AUTO, umbral_dudoso=UMBRAL_DUDOS
                 "score": round(score), "via": via, **_datos_producto(fila),
                 "desajuste": desajuste_tamano(desc, fila.nombre_completo)})
     if f["tipo"] == "costo":
-        transform.aplicar(reg, f["costo_nuevo"], prov, fila, ctx.impuestos, ctx.reglas, ctx.costo_sin_iva)
+        # quien mandó el mensaje va último: es el que dice si el precio trae IVA ("La Quesera"
+        # aunque en Odoo figure como "Lácteos Don Julio")
+        remitente = f.get("proveedor_bloque") or ""
+        transform.aplicar(reg, f["costo_nuevo"], [prov] + ([remitente] if remitente and remitente != prov else []),
+                          fila, ctx.impuestos, ctx.reglas, ctx.costo_sin_iva)
         if fila.costo_actual and not reg.get("falta_iva"):
             nuevo = reg["costo_nuevo"]
             reg["variacion_%"] = round((nuevo / fila.costo_actual - 1) * 100, 1)

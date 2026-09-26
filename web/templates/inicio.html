@@ -126,9 +126,10 @@ importar. Lo que no pueda resolver sola te lo pregunta.</p>
     <details class="agregar">
       <summary>💬 Un mensaje suelto</summary>
       <div class="adentro">
-        <form action="{{ url_for('fuente_mensaje') }}" method="post">
+        <form action="{{ url_for('fuente_mensaje') }}" method="post" id="form-mensaje">
           <label class="campo">¿De qué proveedor es?
             <input name="proveedor" list="proveedores" required placeholder="Empezá a escribir el nombre (si es nuevo, se guarda)"></label>
+          <div class="iva" style="margin:-4px 0 10px"></div>
           <label class="campo">El mensaje, tal cual llegó
             <textarea name="texto" required placeholder="Hola! Te paso los precios&#10;Galletitas $2700&#10;Budines $5600"></textarea></label>
           <button class="boton" type="submit">+ Agregar mensaje</button>
@@ -267,6 +268,13 @@ if (archivos) archivos.addEventListener('change', function () {
   });
   document.getElementById('boton-listas').hidden = archivos.files.length === 0;
 });
+// ---- mensaje suelto: el mismo IVA que las listas (se ve si ya se sabe, se pregunta si no) ----
+var formMensaje = document.getElementById('form-mensaje');
+if (formMensaje) {
+  var provMensaje = formMensaje.querySelector('input[name=proveedor]');
+  filaIva(formMensaje, provMensaje.value);
+  provMensaje.addEventListener('change', function () { filaIva(formMensaje, provMensaje.value); });
+}
 var boton = document.getElementById('analizar');
 if (boton) boton.addEventListener('click', function () { document.getElementById('esperando').hidden = false; });
 </script>

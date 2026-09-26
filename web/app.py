@@ -29,6 +29,7 @@ from core.providers import indice_proveedores
 from core import sheets
 from core.verify import verificar
 from core.transform import costo_de_lista
+from core.pais import IVA_OPCIONES
 
 RAIZ = Path(__file__).resolve().parents[1]
 # ACTUALIZADOR_DATOS permite apuntar a otra carpeta (pruebas, o varios negocios)
@@ -247,10 +248,20 @@ def tarjetas(res):
     return out
 
 
+def iva_por_proveedor(res):
+    """Proveedores de los que no se sabe si cotizan con o sin IVA, con lo que mandaron:
+    se pregunta una vez por proveedor, no por producto."""
+    esp = res.get("esperan_iva")
+    if esp is None or not len(esp):
+        return []
+    return [{"proveedor": prov, "cantidad": len(g), "ejemplos": g["linea"].astype(str).head(3).tolist(),
+             "actual": memoria.iva_de(prov)}
+            for prov, g in esp.groupby("proveedor_iva", sort=True)]
+
+
 def pantalla_inicio(error=None, aviso=None, codigo=200):
     e = leer_estado()
     cat = catalogo(e) if e and e.get("export") else None
-    from core.memory import IVA_OPCIONES
     return render_template("inicio.html", estado=e, cat=resumen(cat) if cat is not None else None,
                            config=leer_config(), memoria=memoria.conteos(),
                            proveedores=ficha_proveedores(), iva_opciones=IVA_OPCIONES,
@@ -451,14 +462,30 @@ def fuente_sheets():
     return redirect(url_for("inicio"))
 
 
+@app.route("/iva_proveedor", methods=["POST"])
+def iva_proveedor():
+    """Cómo cotiza un proveedor (con o sin IVA): queda en su ficha y vale para todo lo que mande."""
+    prov, iva = request.form.get("proveedor", "").strip(), request.form.get("iva", "")
+    if prov and iva in IVA_OPCIONES:
+        memoria.fijar_iva(prov, iva)
+        _cache["resultado"] = None
+    return redirect(url_for("revisar"))
+
+
 @app.route("/fuente/mensaje", methods=["POST"])
 def fuente_mensaje():
     prov = request.form.get("proveedor", "").strip()
     texto = request.form.get("texto", "").strip()
+    iva = request.form.get("iva", "")
     if not prov or not texto:
         return pantalla_inicio(error="Para un mensaje suelto hacen falta el proveedor y el mensaje.", codigo=400)
+    if iva not in IVA_OPCIONES and not memoria.sabe_iva(prov):
+        return pantalla_inicio(error=f"Falta decir si los precios del mensaje de {prov} incluyen IVA. "
+                                     "Queda guardado y no se vuelve a preguntar.", codigo=400)
     conocido = memoria.buscar_proveedor(prov)
     prov = memoria.registrar_proveedor(prov, tipo="mensaje")
+    if iva in IVA_OPCIONES:
+        memoria.fijar_iva(prov, iva)
     agregar_fuente({"tipo": "mensaje", "proveedor": prov, "texto": texto,
                     "nombre": f"Mensaje de {prov} ({ahora()})"})
     if not conocido:
@@ -485,7 +512,7 @@ def fuente_lista():
             iva = ivas[i] if i < len(ivas) else ""
             if not prov:
                 raise ErrorDeDatos(f"Elegí de qué proveedor es {f.filename}.")
-            if not iva and not memoria.iva_de(prov):
+            if not iva and not memoria.sabe_iva(prov):
                 raise ErrorDeDatos(f"Para {prov} falta decir si los precios de la lista incluyen IVA. "
                                    "Se pregunta una sola vez.")
             contenido = f.read()
@@ -601,7 +628,7 @@ def revisar():
              "el nombre exacto.") if no_encontrado else None
     return render_template(
         "revisar.html", estado=e, cat=resumen(cat), fuentes=res["fuentes"], error=error,
-        tarjetas=tarjetas(res),
+        tarjetas=tarjetas(res), iva_proveedores=iva_por_proveedor(res), iva_opciones=IVA_OPCIONES,
         listos=res["listos"].to_dict("records"),
         sin_cambio=len(res["sin_cambio"]),
         saltados=res["saltados"].to_dict("records"),
@@ -769,7 +796,7 @@ def mostrar_generado(archivos, error=None, verificacion=None):
     ctl = control(res, memoria.margen_variable()) if res is not None else pd.DataFrame()
     return render_template("generado.html", archivos=archivos, error=error,
                            listos=len(res["listos"]) if res is not None else 0,
-                           pendientes=len(res["confirmar"]) if res is not None else 0,
+                           pendientes=len(res["confirmar"]) + len(res["esperan_iva"]) if res is not None else 0,
                            control=ctl.to_dict("records") if len(ctl) else [],
                            a_revisar=int(ctl["revisar"].ne("").sum()) if len(ctl) else 0,
                            verificacion=verificacion)
@@ -850,7 +877,6 @@ def agregar_memoria():
 
 @app.route("/memoria")
 def ver_memoria():
-    from core.memory import IVA_OPCIONES
     tablas = {n: memoria.leer(n).reset_index().to_dict("records") for n in TABLAS_EDITABLES}
     hist = memoria.leer("historial")
     cat = catalogo(leer_estado())

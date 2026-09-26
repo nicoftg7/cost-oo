@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import pytest
 
-from conftest import export_df
+from conftest import con_iva_conocido, export_df
 
 
 @pytest.fixture
@@ -15,6 +15,7 @@ def cliente(tmp_path, monkeypatch):
     import web.app as modulo
     modulo = importlib.reload(modulo)
     modulo.app.config["TESTING"] = True
+    con_iva_conocido(modulo.memoria)
     return modulo, modulo.app.test_client()
 
 
@@ -187,6 +188,7 @@ def test_proveedores_se_guardan_todos_juntos(cliente):
     assert df.loc["Uno", "tipo"] == "mensaje" and df.loc["Uno", "margen"] == "variable"
     assert modulo.memoria.margen_variable() == {"Uno"}
     imp = modulo.memoria.leer("impuestos")
+    imp = imp[imp.clave == "Dos"]
     assert list(imp.iva) == ["según producto"] and list(imp.percepcion) == ["0.03"]
 
 
@@ -235,6 +237,35 @@ def test_negocio_que_carga_el_costo_sin_iva(cliente):
     assert "carga el costo <b>sin IVA</b>" in c.get("/memoria").get_data(as_text=True)
 
 
+def test_proveedor_sin_iva_conocido_espera_la_respuesta(cliente):
+    """Un mensaje suelto de un proveedor nuevo pide el IVA al cargarlo. Lo que llega de la
+    planilla no tiene dónde preguntarlo: sus precios no entran al archivo hasta que se
+    responde, una vez por proveedor, en la revisión."""
+    modulo, c = cliente
+    buf = io.BytesIO()
+    export_df().to_csv(buf, index=False)
+    c.post("/export", data={"export": (io.BytesIO(buf.getvalue()), "export.csv")},
+           content_type="multipart/form-data")
+    r = c.post("/fuente/mensaje", data={"proveedor": "Almacén Nuevo", "texto": "Orégano 50 g $700"})
+    assert r.status_code == 400 and "incluyen IVA" in r.get_data(as_text=True)
+    c.post("/fuente/mensaje", data={"proveedor": "Almacén Nuevo", "texto": "Orégano 50 g $700", "iva": "21"})
+    assert modulo.memoria.iva_de("Almacén Nuevo") == "21"
+
+    planilla = 'Proveedor,Chequeado,Mensaje\n"Granja Otra",TRUE,"Lavandina 1 l $750\nComino 25 g $560"\n'
+    c.post("/fuente/archivo", data={"archivos": (io.BytesIO(planilla.encode()), "planilla.csv")},
+           content_type="multipart/form-data")
+    _, res = modulo.resultado()
+    assert set(res["esperan_iva"].referencia) == {"LIM001", "ESP002"}
+    assert not set(res["listos"].referencia) & {"LIM001", "ESP002"}
+    pagina = c.get("/revisar").get_data(as_text=True)
+    assert "¿Los precios de Granja Otra incluyen IVA?" in pagina and "Mandó 2 precios" in pagina
+    c.post("/iva_proveedor", data={"proveedor": "Granja Otra", "iva": "21"})
+    _, res = modulo.resultado()
+    assert res["esperan_iva"].empty
+    costos = res["listos"].set_index("referencia")["costo_nuevo"]
+    assert costos["LIM001"] == pytest.approx(907.5) and costos["ESP002"] == pytest.approx(677.6)
+
+
 def test_elegir_producto_aprende_alias(cliente):
     modulo, c = cliente
     subir(c, export_df(), 'Proveedor,Chequeado,Mensaje\n"Pastas Río",TRUE,"Los de la casa $3800"\n')
@@ -279,7 +310,8 @@ def cargar_lacteos(c, con_referencia=True):
     df.to_csv(buf, index=False)
     c.post("/export", data={"export": (io.BytesIO(buf.getvalue()), "export.csv")},
            content_type="multipart/form-data")
-    c.post("/fuente/mensaje", data={"proveedor": "Lácteos del Sur", "texto": "dulce leches-2000\nyogur bebible 1300"})
+    c.post("/fuente/mensaje", data={"proveedor": "Lácteos del Sur", "iva": "incluido",
+                                    "texto": "dulce leches-2000\nyogur bebible 1300"})
 
 
 def tarjeta_de(modulo, texto):

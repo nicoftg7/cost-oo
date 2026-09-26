@@ -151,6 +151,7 @@ tr.editada td { background: var(--ambar-fondo); }
 .fila-lista { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; align-items: center; padding: 10px; border: 1px solid var(--linea); border-radius: 10px; margin-top: 8px; background: var(--fondo); }
 .fila-lista .archivo { grid-column: 1 / -1; font-weight: 600; overflow-wrap: anywhere; }
 .fila-lista input, .fila-lista select { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); }
+#form-mensaje .iva select, .tarjeta .fila-form select { width: 100%; max-width: 460px; font: inherit; padding: 7px 9px; border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); color: var(--tinta); }
 @media (max-width: 640px) { .fila-lista { grid-template-columns: 1fr; } }
 .soltar + .boton, form > .boton { margin-top: 10px; }
 ul.fuentes { list-style: none; padding: 0; margin: 10px 0 0; }
