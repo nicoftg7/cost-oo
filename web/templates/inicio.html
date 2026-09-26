@@ -108,12 +108,12 @@ importar. Lo que no pueda resolver sola te lo pregunta.</p>
     </details>
 
     <details class="agregar" {% if estado and estado.fuentes %}open{% endif %}>
-      <summary>📄 Listas de precios (PDF o Excel)</summary>
+      <summary>📄 Listas de precios (PDF, Excel o foto)</summary>
       <div class="adentro">
         <form action="{{ url_for('fuente_lista') }}" method="post" enctype="multipart/form-data" id="form-listas">
           <label class="soltar">
-            <input type="file" name="listas" accept=".pdf,.xlsx,.xls,.csv" multiple required id="archivos-listas">
-            Arrastrá acá una o varias listas, o hacé clic para buscarlas
+            <input type="file" name="listas" accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.webp" multiple required id="archivos-listas">
+            Arrastrá acá una o varias listas (PDF, Excel o una foto), o hacé clic para buscarlas
           </label>
           <div id="filas-listas"></div>
           <button class="boton" type="submit" id="boton-listas" hidden>+ Agregar listas</button>

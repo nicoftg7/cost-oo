@@ -384,6 +384,13 @@ Dos" inherited "Distribuidora Uno"'s VAT setting, and a supplier known by a nick
 spreadsheet lost its setting once its name was translated to the Odoo one. And on a list, VAT
 now comes only from the distributor that sent it, never from a brand printed inside it.
 
+Checking the launch post against the app, line by line, found one more: the photo reader and
+the code-less path (a producer's PDF or a flyer with just names and prices, read like a
+message) both existed in the cycle, but the upload screen never let them in — the file picker
+only offered PDF and Excel, and the upload check rejected anything without item codes. Now a
+photo or a code-less list goes in from the same place as any other list, with a test that
+uploads a photo through the screen.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

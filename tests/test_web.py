@@ -266,6 +266,32 @@ def test_proveedor_sin_iva_conocido_espera_la_respuesta(cliente):
     assert costos["LIM001"] == pytest.approx(907.5) and costos["ESP002"] == pytest.approx(677.6)
 
 
+def test_lista_en_foto_desde_la_pantalla(cliente):
+    """El lector de fotos existía, pero el selector de archivos solo dejaba elegir PDF y Excel."""
+    pytest.importorskip("rapidocr")
+    from PIL import Image, ImageDraw, ImageFont
+    modulo, c = cliente
+    buf = io.BytesIO()
+    export_df().to_csv(buf, index=False)
+    c.post("/export", data={"export": (io.BytesIO(buf.getvalue()), "export.csv")},
+           content_type="multipart/form-data")
+    modulo.memoria.registrar_proveedor("Especias Luna")        # ya pasó la bienvenida
+    assert 'accept=".pdf,.xlsx,.xls,.csv,.jpg' in c.get("/").get_data(as_text=True)
+    img = Image.new("RGB", (1000, 340), "white")
+    dibujo, fuente = ImageDraw.Draw(img), ImageFont.load_default(size=52)
+    for i, linea in enumerate(["Oregano 50 g   $660", "Comino 25 g   $704"]):
+        dibujo.text((50, 50 + i * 130), linea, fill="black", font=fuente)
+    foto = io.BytesIO()
+    img.save(foto, "JPEG")
+    r = c.post("/fuente/listas", data={"proveedor": "Especias Luna", "iva": "incluido",
+                                       "listas": (io.BytesIO(foto.getvalue()), "folleto.jpg")},
+               content_type="multipart/form-data")
+    assert r.status_code in (200, 302)
+    _, res = modulo.resultado()
+    costos = dict(zip(res["listos"].referencia, res["listos"].costo_nuevo))
+    assert costos == {"ESP001": pytest.approx(660), "ESP002": pytest.approx(704)}
+
+
 def test_elegir_producto_aprende_alias(cliente):
     modulo, c = cliente
     subir(c, export_df(), 'Proveedor,Chequeado,Mensaje\n"Pastas Río",TRUE,"Los de la casa $3800"\n')

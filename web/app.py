@@ -23,7 +23,7 @@ from core.memory import Memoria
 from core.output import (control, escribir_import, escribir_reporte, escribir_rotacion,
                          filas_historial, tabla_import)
 from core.parse import huella
-from core.pricelist import leer_lista
+from core.pricelist import leer_fuente
 from core.normalize import normalizar
 from core.providers import indice_proveedores
 from core import sheets
@@ -506,7 +506,7 @@ def fuente_lista():
     listas, nuevos = [], []
     try:
         if not archivos:
-            raise ErrorDeDatos("Arrastrá al menos una lista (PDF, Excel o CSV).")
+            raise ErrorDeDatos("Arrastrá al menos una lista (PDF, Excel, CSV o una foto).")
         for i, f in enumerate(archivos):
             prov = (provs[i] if i < len(provs) else "").strip()
             iva = ivas[i] if i < len(ivas) else ""
@@ -516,11 +516,13 @@ def fuente_lista():
                 raise ErrorDeDatos(f"Para {prov} falta decir si los precios de la lista incluyen IVA. "
                                    "Se pregunta una sola vez.")
             contenido = f.read()
-            articulos, no_leidos = leer_lista(f.filename, contenido, idx)
-            listas.append((f.filename, prov, iva, contenido, articulos, no_leidos))
+            # sin códigos (la foto de un folleto, el PDF de un productor) también vale: se lee
+            # como un mensaje de ese proveedor. Solo se frena si no hay ningún precio
+            leer_fuente(f.filename, contenido, idx)
+            listas.append((f.filename, prov, iva, contenido))
     except ErrorDeDatos as err:
         return pantalla_inicio(error=str(err), codigo=400)
-    for nombre, prov, iva, contenido, articulos, no_leidos in listas:
+    for nombre, prov, iva, contenido in listas:
         conocido = memoria.buscar_proveedor(prov)
         prov = memoria.registrar_proveedor(prov, tipo="lista")
         if not conocido:
