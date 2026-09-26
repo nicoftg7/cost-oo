@@ -71,6 +71,12 @@ Output:
 
 All of it is a fictional store that ships with the repo (see *Try it* below).
 
+The confirmation screen for that same demo store, after loading a supplier list — this is the
+kind of thing it flags instead of silently getting wrong: a supplier's per-unit price that's
+actually a bulk-pack price in disguise.
+
+![Review screen: totals, and a case where the app noticed a price looked like a 12-pack price, not a per-unit one](docs/img/revision-del-ciclo.png)
+
 ## Try it
 
 The repo ships a fictional store in [`ejemplo/`](ejemplo): an Odoo export, a sheet of supplier
