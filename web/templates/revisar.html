@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% macro variacion(v) -%}
+  {%- if v == v and v is not none -%}
+    <span class="{{ 'sube' if v > 0 else 'baja' if v < 0 else 'gris' }}">{{ v|pct }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro de_donde(r) -%}
+  <span class="fuente">{% if r.fuente %}<b>{{ r.fuente }}</b>{% endif %}{% if r.origen %} · {{ r.origen }}{% endif %}{% if r.codigo|vacio %} · cód. {{ r.codigo }}{% endif %}</span>
+{%- endmacro %}
+
+{% macro elegir_producto(t, etiqueta_boton="✓ Es este producto") %}
+<form action="{{ url_for('decidir') }}" method="post">
+  <input type="hidden" name="clave" value="{{ t.clave_renglon }}">
+  <input type="hidden" name="accion" value="elegir">
+  {% for o in t.opciones %}
+  <label class="opcion">
+    <input type="radio" name="elegido" value="{{ o.referencia }}" {% if loop.first and t.alerta != 'sin match' %}checked{% endif %}>
+    <span><b>{{ o.nombre }}</b><br>
+      <span class="costos">Costo en Odoo: {{ o.costo_actual|pesos or 'sin costo' }} · Precio {{ 'de la lista' if t.es_lista == true else 'del mensaje' }}: {{ t.costo_nuevo|pesos }}</span></span>
+  </label>
+  {% endfor %}
+  <div class="buscar">
+    <input list="productos" name="buscado" placeholder="{{ 'Ninguno: buscá el producto por nombre…' if t.opciones else 'Buscá el producto por nombre…' }}">
+  </div>
+  <div class="acciones"><button class="boton" type="submit">{{ etiqueta_boton }}</button>
+    <span class="gris">{{ 'La app aprende el código de la lista para la próxima.' if t.es_lista == true else 'La app lo recuerda para los próximos ciclos.' }}</span></div>
+</form>
+{% endmacro %}
+
+{% macro boton(clave, accion, texto, clase="boton", referencia="") %}
+<form action="{{ url_for('decidir') }}" method="post">
+  <input type="hidden" name="clave" value="{{ clave }}">
+  <input type="hidden" name="accion" value="{{ accion }}">
+  <input type="hidden" name="referencia" value="{{ referencia }}">
+  <button class="{{ clase }}" type="submit">{{ texto }}</button>
+</form>
+{% endmacro %}
+
+{% macro cambio_costo(t) %}
+  <div><b>{{ t.nombre_odoo }}</b></div>
+  <div class="cambio">{{ t.costo_actual|pesos or 'sin costo' }} <span class="flecha">→</span> <b>{{ t.costo_nuevo|pesos }}</b> {{ variacion(t['variacion_%']) }}</div>
+  {% if t.precio_lista|vacio %}<div class="gris">Lista sin impuestos {{ t.precio_lista|pesos }} + impuestos.</div>{% endif %}
+  {% if t.precio_por_kilo|vacio %}<div class="gris">Cotiza {{ t.precio_por_kilo|pesos }} el kilo.</div>{% endif %}
+{% endmacro %}
+
+{% block contenido %}
+<h1>Revisión del ciclo</h1>
+<p class="bajada">Lo verde entra solo al archivo. Lo amarillo necesita que lo mires.
+Cada costo dice de qué mensaje o lista salió.</p>
+
+<div class="caja">
+  <h3>🔍 Qué se analizó</h3>
+  <ul style="margin:0; padding-left:20px">
+  {% for f in fuentes %}
+    <li><b>{{ f.nombre }}</b>:
+      {% if f.tipo == 'planilla' %}
+        {{ f.analizados }} mensajes nuevos{% if f.ya_procesados %}, {{ f.ya_procesados }} ya procesados antes (sin cambios){% endif %}{% if f.sin_cambios %}, {{ f.sin_cambios }} sin mensaje{% endif %}{% if f.pendientes %}, {{ f.pendientes }} pendientes{% endif %}.
+      {% elif f.tipo == 'lista' %}
+        {% if f.ya_procesados %}esta misma lista ya se había procesado (ver abajo en Proveedores).
+        {% else %}{{ f.articulos }} artículos leídos.
+          {% if f.no_leidos %}<details style="display:inline"><summary>{{ f.no_leidos|length }} renglones no se pudieron leer</summary>
+            <div class="adentro gris">{% for l in f.no_leidos %}{{ l }}<br>{% endfor %}
+            Si alguno es tuyo, cargalo como mensaje suelto.</div></details>{% endif %}
+          {% if f.aviso_fecha %}<br><span style="color:var(--ambar)">⚠️ {{ f.aviso_fecha }}</span>{% endif %}
+        {% endif %}
+      {% elif f.ya_procesados %}este mismo mensaje ya se había procesado (ver abajo en Proveedores).
+      {% else %}analizado.{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</div>
+
+<div class="resumen">
+  <a href="#listos"><div class="cifra verde"><b>{{ listos|length }}</b>✅ listos para importar</div></a>
+  <a href="#confirmar"><div class="cifra ambar"><b>{{ tarjetas|length }}</b>👀 para confirmar</div></a>
+  <div class="cifra"><b>{{ sin_cambio }}</b>✔️ ya tienen el costo correcto</div>
+  <a href="#avisos"><div class="cifra"><b>{{ faltantes|length + notas|length + rotacion|length }}</b>🔔 avisos</div></a>
+</div>
+
+<h2 id="confirmar">👀 Para confirmar</h2>
+{% if not tarjetas %}
+<div class="caja">🎉 No queda nada por confirmar.</div>
+{% endif %}
+{% for t in tarjetas %}
+<div class="tarjeta" id="{{ t.id_tarjeta }}">
+  <div class="arriba">
+    <span class="chip">{{ t.proveedor or t.proveedor_bloque or 'Proveedor sin identificar' }}</span>
+    <span class="porque">{{ t.explicacion }}</span>
+  </div>
+  <div class="mensaje">{{ t.linea }}</div>
+  <div style="margin:-6px 0 10px">{{ de_donde(t) }}</div>
+  {% if t.sugerir_bulto|vacio and t.codigo|vacio %}
+  <div class="sugerencia">
+    <span>Parece el precio del <b>bulto de {{ t.sugerir_bulto|int }}</b>: por unidad serían
+      <b>{{ t.costo_por_unidad|pesos }}</b> (hoy {{ t.costo_actual|pesos }}).</span>
+    <form action="{{ url_for('decidir') }}" method="post">
+      <input type="hidden" name="clave" value="{{ t.clave_renglon }}"><input type="hidden" name="accion" value="bulto">
+      <input type="hidden" name="referencia" value="{{ t.referencia }}"><input type="hidden" name="unidades" value="{{ t.sugerir_bulto|int }}">
+      <button class="boton verde chico" type="submit">📦 Sí, es por bulto: dividir por {{ t.sugerir_bulto|int }}</button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if t.tipo_tarjeta == 'aprobar' %}
+    {{ cambio_costo(t) }}
+    <div class="acciones">{{ boton(t.clave_renglon, 'aprobar', '✓ Aprobar este costo', 'boton verde', t.referencia) }}</div>
+    <details><summary>No es este producto</summary><div class="adentro">{{ elegir_producto(t) }}</div></details>
+
+  {% elif t.tipo_tarjeta == 'fuente' %}
+    {{ cambio_costo(t) }}
+    <div class="acciones">
+      {{ boton(t.clave_renglon, 'fuente_ok', '✓ Ahora se lo compro a ' ~ t.fuente ~ ': usar este costo', 'boton verde', t.referencia) }}
+      {{ boton(t.clave_renglon, 'saltar', 'Sigo comprándoselo a ' ~ t.fuente_habitual ~ ': no usar', 'boton claro') }}
+    </div>
+    <details><summary>No es este producto</summary><div class="adentro">{{ elegir_producto(t) }}</div></details>
+
+  {% elif t.tipo_tarjeta == 'iva' %}
+    <div><b>{{ t.nombre_odoo }}</b></div>
+    <p style="margin:6px 0">Precio de lista sin IVA: <b>{{ t.precio_lista|pesos }}</b>{% if t.percepcion|vacio and t.percepcion > 0 %}
+      <span class="gris">(se suma también {{ (t.percepcion * 100)|round(1)|replace('.0', '') }}% de percepción)</span>{% endif %}.
+      Costo en Odoo hoy: {{ t.costo_actual|pesos }}.</p>
+    <p class="gris" style="margin:0">¿Qué IVA lleva este producto? Se guarda: no se vuelve a preguntar.</p>
+    <div class="acciones">
+      {% for o in t.opciones_iva %}
+      <form action="{{ url_for('decidir') }}" method="post">
+        <input type="hidden" name="clave" value="{{ t.clave_renglon }}"><input type="hidden" name="accion" value="iva_producto">
+        <input type="hidden" name="referencia" value="{{ t.referencia }}"><input type="hidden" name="iva" value="{{ o.valor }}">
+        <button class="{{ 'boton verde' if o.sugerido else 'boton claro' }}" type="submit">IVA {{ o.texto }} → costo {{ o.costo|pesos }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    <details><summary>No es este producto</summary><div class="adentro">{{ elegir_producto(t) }}</div></details>
+
+  {% elif t.tipo_tarjeta == 'duplicado' %}
+    <div><b>{{ t.nombre_odoo }}</b></div>
+    <p style="margin:6px 0">Ahora entra el otro: <b>{{ t.gana_costo|pesos }}</b>
+      <span class="gris">(“{{ t.gana_linea }}” · {{ t.gana_origen }})</span>.<br>
+      Este dice <b>{{ t.costo_nuevo|pesos }}</b>. ¿Cuál vale?</p>
+    <div class="acciones">
+      <form action="{{ url_for('decidir') }}" method="post">
+        <input type="hidden" name="clave" value="{{ t.clave_renglon }}"><input type="hidden" name="accion" value="preferir">
+        <input type="hidden" name="otro" value="{{ t.gana }}">
+        <button class="boton" type="submit">✓ Usar este ({{ t.costo_nuevo|pesos }})</button></form>
+      {{ boton(t.clave_renglon, 'saltar', 'Dejar el otro (' ~ (t.gana_costo|pesos) ~ ')', 'boton claro') }}
+    </div>
+    <details><summary>Este renglón es otro producto</summary><div class="adentro">{{ elegir_producto(t) }}</div></details>
+
+  {% elif t.tipo_tarjeta == 'presentacion' %}
+    {{ cambio_costo(t) }}
+    <p class="gris" style="margin:0">¿Es el mismo producto con otro envase, o es otro producto?</p>
+    <div class="acciones">
+      {{ boton(t.clave_renglon, 'gramaje', '✓ Mismo producto: corregir la presentación en el nombre', 'boton verde', t.referencia) }}
+      {{ boton(t.clave_renglon, 'presentacion', 'Mismo producto: dejar el nombre como está', 'boton claro', t.referencia) }}
+    </div>
+    <details><summary>Es otro producto</summary><div class="adentro">{{ elegir_producto(t) }}</div></details>
+
+  {% else %}
+    {% if t.opciones %}<p class="gris" style="margin:0 0 6px">¿Cuál de estos es?</p>{% endif %}
+    {{ elegir_producto(t) }}
+  {% endif %}
+
+  <div class="secundarias">
+    {{ boton(t.clave_renglon, 'saltar', '⏭ Saltear por este ciclo', 'boton link') }}
+    {% if t.es_lista == true %}
+      {{ boton(t.clave_renglon, 'ignorar', '🚫 No se lo compramos a ' ~ t.fuente ~ ': no volver a preguntar', 'boton link') }}
+    {% else %}
+      {{ boton(t.clave_renglon, 'ignorar', '🚫 No lo vendemos: no volver a preguntar', 'boton link') }}
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<datalist id="productos">
+  {% for p in productos %}<option value="{{ p }}">{% endfor %}
+</datalist>
+
+<h2 id="listos">✅ Listos para importar ({{ listos|length }})</h2>
+{% if listos %}
+<div class="tabla"><table>
+  <tr><th>Producto en Odoo</th><th class="num">Costo actual</th><th class="num">Costo nuevo</th><th class="num">Cambio</th><th>De dónde sale</th><th></th></tr>
+  {% for r in listos %}
+  <tr>
+    <td>{{ r.nombre_odoo }}</td>
+    <td class="num">{{ r.costo_actual|pesos }}</td>
+    <td class="num"><b>{{ r.costo_nuevo|pesos }}</b></td>
+    <td class="num">{{ variacion(r['variacion_%']) }}</td>
+    <td>{{ de_donde(r) }}<br><span class="gris">“{{ r.linea }}”</span></td>
+    <td>{{ boton(r.clave_renglon, 'saltar', '✕ Sacar', 'boton link') }}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% else %}
+<div class="caja gris">Todavía no hay costos nuevos para importar.</div>
+{% endif %}
+
+<h2 id="avisos">🔔 Avisos</h2>
+<p class="gris" style="margin-top:-6px">Nada de esto se cambia solo en Odoo. Está para que decidas vos.</p>
+
+{% if notas %}
+<div class="caja">
+  <h3>Proveedores</h3>
+  <div class="tabla"><table>
+    <tr><th>Proveedor</th><th>Estado</th><th></th></tr>
+    {% for n in notas %}<tr><td>{{ n.proveedor }}</td><td>{{ n.nota }}{% if n.linea and 'ya' in n.nota %}<br><span class="gris">“{{ n.linea }}”</span>{% endif %}</td>
+      <td>{% if n.huella and 'ya' in n.nota %}{{ boton(n.huella, 'forzar', '🔁 Analizar igual', 'boton link') }}{% endif %}</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+{% if faltantes %}
+<div class="caja">
+  <h3>Faltantes que avisaron los proveedores</h3>
+  <p class="gris" style="margin-top:0">Si querés despublicarlos, hacelo a mano en Odoo.</p>
+  <div class="tabla"><table>
+    <tr><th>Proveedor</th><th>Producto</th><th>¿Publicado hoy?</th><th>Dice el mensaje</th></tr>
+    {% for r in faltantes %}<tr><td>{{ r.proveedor }}</td><td>{{ r.nombre_odoo or r.descripcion }}</td>
+      <td>{{ 'Sí' if r.publicado == true else ('No' if r.publicado == false else '') }}</td><td class="gris">{{ r.linea }}</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+{% if igual %}
+<div class="caja">
+  <h3>Productos que siguen al mismo precio</h3>
+  <div class="tabla"><table>
+    <tr><th>Proveedor</th><th>Producto</th><th class="num">Costo</th><th>Dice el mensaje</th></tr>
+    {% for r in igual %}<tr><td>{{ r.proveedor }}</td><td>{{ r.nombre_odoo or r.descripcion }}</td><td class="num">{{ r.costo_actual|pesos }}</td><td class="gris">{{ r.linea }}</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+{% if rotacion %}
+<div class="caja">
+  <h3>Variantes que el proveedor alterna</h3>
+  <p class="gris" style="margin-top:0">Se sugiere cambiar la publicación. Al generar se arma un archivo aparte, opcional.</p>
+  <div class="tabla"><table>
+    <tr><th>Grupo</th><th>Producto</th><th>Sugerencia</th></tr>
+    {% for r in rotacion %}<tr><td>{{ r.grupo }}</td><td>{{ r.nombre_completo }}</td><td><b>{{ r.accion|capitalize }}</b></td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+{% if saltados %}
+<div class="caja">
+  <h3>Salteados en este ciclo ({{ saltados|length }})</h3>
+  <div class="tabla"><table>
+    <tr><th>Proveedor</th><th>Dice</th><th></th></tr>
+    {% for r in saltados %}<tr><td>{{ r.fuente or r.proveedor }}</td><td>{{ r.linea }}</td>
+      <td>{{ boton(r.clave_renglon, 'restaurar', '↩ Volver a incluir', 'boton link') }}</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+{% if no_mencionados %}
+<details class="caja">
+  <summary>Productos que el proveedor no mencionó ({{ no_mencionados|length }})</summary>
+  <div class="adentro tabla"><table>
+    <tr><th>Proveedor</th><th>Producto</th><th class="num">Costo</th><th>¿Publicado?</th></tr>
+    {% for r in no_mencionados %}<tr><td>{{ r.proveedor }}</td><td>{{ r.nombre_completo }}</td><td class="num">{{ r.costo_actual|pesos }}</td><td>{{ 'Sí' if r.publicado else 'No' }}</td></tr>{% endfor %}
+  </table></div>
+</details>
+{% endif %}
+
+{% if ignorados %}
+<details class="caja">
+  <summary>Ignorados porque no se venden o no se compran ahí ({{ ignorados|length }})</summary>
+  <div class="adentro tabla"><table>
+    <tr><th>Proveedor</th><th>Dice</th><th>Motivo</th></tr>
+    {% for r in ignorados %}<tr><td>{{ r.fuente or r.proveedor }}</td><td>{{ r.linea }}</td><td class="gris">{{ r.via }}</td></tr>{% endfor %}
+  </table></div>
+</details>
+{% endif %}
+
+{% if fuera %}
+<details class="caja">
+  <summary>Artículos de las listas que no se parecen a nada del catálogo ({{ fuera|length }})</summary>
+  <div class="adentro">
+    <p class="gris" style="margin-top:0">No se preguntan. Si alguno sí es tuyo, cargalo como mensaje suelto y confirmalo una vez.</p>
+    <div class="tabla"><table>
+      <tr><th>Lista</th><th>Código</th><th>Artículo</th><th class="num">Precio</th></tr>
+      {% for r in fuera %}<tr><td>{{ r.fuente }}</td><td>{{ r.codigo }}</td><td>{{ r.descripcion }}</td><td class="num">{{ r.costo_nuevo|pesos }}</td></tr>{% endfor %}
+    </table></div>
+  </div>
+</details>
+{% endif %}
+{% endblock %}
+
+{% block pie %}
+<div class="pie-fijo">
+  <form action="{{ url_for('generar') }}" method="post">
+    <button class="boton verde grande" type="submit" {% if not listos %}disabled style="opacity:.5;cursor:default"{% endif %}>
+      ⬇️ Generar archivo para Odoo ({{ listos|length }} productos)</button>
+  </form>
+  {% if tarjetas %}<span class="nota">Los {{ tarjetas|length }} que quedan por confirmar no entran. Podés generarlo igual y confirmarlos después.</span>{% endif %}
+</div>
+{% endblock %}

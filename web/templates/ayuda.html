@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>💡 Cómo funciona</h1>
+<p class="bajada">Los proveedores mandan precios por WhatsApp, en planillas o en listas. Esta app los lee,
+encuentra cada producto en Odoo y arma un archivo para importar los costos nuevos. Solo toca el
+<b>costo</b>: nunca el precio de venta, el stock ni la publicación.</p>
+
+<h2>🔁 El ciclo</h2>
+<div class="caja">
+  <ol class="pasos">
+    <li><b>Exportá los productos de Odoo</b> con la casilla “Quiero actualizar datos” tildada, y cargalo.</li>
+    <li><b>Sumá lo que mandaron los proveedores.</b> Se pueden combinar en un mismo ciclo:
+      <ul>
+        <li><b>La planilla de Google Sheets</b>, con un clic. Se leen sus tres pestañas: <b>Mensajes</b> (lo que se analiza),
+          <b>Lista</b> (quiénes mandan lista: la app avisa cuál falta cargar) y <b>Manual</b> (los que se actualizan a mano:
+          la app solo los recuerda).</li>
+        <li><b>Listas de precios</b> en PDF o Excel: arrastrás una o varias y elegís de qué proveedor es cada una.
+          Si el proveedor no está, lo escribís y queda guardado.</li>
+        <li><b>Un mensaje suelto</b>: elegís el proveedor y pegás el mensaje. Sirve para lo que llega a mitad de mes.</li>
+      </ul></li>
+    <li><b>Analizá y confirmá lo amarillo</b>: son los casos en que la app no está segura.</li>
+    <li><b>Mirá la lista una última vez</b>, generá el archivo e importalo en Odoo.</li>
+    <li><b>Verificá</b>: exportá de nuevo de Odoo y subilo. La app confirma producto por producto que haya quedado bien.</li>
+  </ol>
+</div>
+
+<h2>🕓 Mensajes nuevos y mensajes viejos</h2>
+<div class="caja">
+  <p style="margin-top:0">La app recuerda cada mensaje que ya procesó. Si en la planilla un proveedor tiene el mismo mensaje
+  del mes pasado, lo marca como <b>“ya procesado”</b> y no lo vuelve a analizar: son precios que ya están en Odoo.
+  Si el proveedor cambió aunque sea un precio, es un mensaje nuevo y se analiza.</p>
+  <p style="margin-bottom:0">Si igual querés volver a pasarlo, en Avisos está el botón <b>Analizar igual</b>.</p>
+</div>
+
+<h2>📖 Qué significa cada cosa</h2>
+<div class="caja">
+  <p style="margin-top:0"><b style="color:var(--verde)">Listos para importar.</b> La app encontró el producto con seguridad
+    y el costo cambia menos de un 30%. Entran solos al archivo. Igual podés sacar cualquiera.</p>
+  <p><b style="color:var(--ambar)">Para confirmar.</b> Casos en que la app prefiere preguntarte:</p>
+  <ul>
+    <li><b>No estoy seguro de qué producto es</b>: elegí el correcto o buscalo por nombre.</li>
+    <li><b>No encontré este producto en Odoo</b>: buscalo por nombre. Si es un producto nuevo que todavía no está cargado, salteálo.</li>
+    <li><b>El costo cambia más de un 30%</b>: puede ser un aumento real o un error del mensaje. Aprobalo solo si tiene sentido.</li>
+    <li><b>Otra presentación</b>: el proveedor cotiza 25 g y en Odoo está cargado de 50 g. Puede ser un envase nuevo o puede ser otro producto.</li>
+    <li><b>Se lo venís comprando a otro</b>: el producto lo vende más de un proveedor (por ejemplo, una marca de atún que tienen varias
+      distribuidoras) y este precio no es de a quien se lo comprás. Si cambiaste de proveedor, usá el costo nuevo. Si no, no lo uses.</li>
+    <li><b>Otro renglón ya actualiza este producto</b>: el mismo producto vino dos veces (por ejemplo, en la planilla y en un
+      mensaje suelto). Elegí cuál vale. Si no decís nada, gana el que se cargó último.</li>
+  </ul>
+  <p><b>Avisos.</b> Faltantes, proveedores que no mandaron precios, mensajes ya procesados. La app <b>no despublica nada sola</b>.</p>
+  <p style="margin-bottom:0"><b>Saltear por este ciclo</b> deja el renglón afuera solo este mes. <b>No lo vendemos</b> hace que la app
+    no pregunte más por ese producto de ese proveedor.</p>
+</div>
+
+<h2>📄 Listas de distribuidoras</h2>
+<div class="caja">
+  <p style="margin-top:0">Una lista de distribuidora trae cientos o miles de artículos, y se venden pocos. La app solo te pregunta
+  por los que se parecen a algo del catálogo. El resto queda en una lista aparte, sin preguntar.</p>
+  <p>La primera vez confirmás qué artículo es cada producto. La app aprende el <b>código</b> de la distribuidora
+  (por ejemplo AL-0014) y desde la próxima lista esos productos entran solos, aunque la descripción cambie.</p>
+  <p>La primera vez que cargás la lista de un proveedor te pregunta si los precios incluyen IVA. Queda guardado en su ficha
+  (en <a href="{{ url_for('ver_memoria') }}#proveedores">Lo aprendido → Proveedores</a>) y no vuelve a preguntar.</p>
+  <p>Si la lista viene sin IVA y mezcla alícuotas (la harina va al 10,5% y el resto al 21%, algo común en cooperativas mayoristas), elegí
+  <b>“21% o 10,5% según el producto”</b>. La primera vez que aparece cada producto, la app pregunta qué IVA lleva y sugiere
+  uno. Queda guardado para ese producto.</p>
+  <p>Algunas listas cotizan el <b>bulto cerrado</b> (“HARINA 10 x 1 Kg”). Si el precio dividido por el bulto queda cerca del
+  costo de hoy, la tarjeta lo sugiere. Al confirmarlo, ese código se divide solo en las próximas listas.</p>
+  <p style="margin-bottom:0">Si dos listas ofrecen el mismo producto (el mismo atún lo tienen dos distribuidoras), las tarjetas
+  aparecen una al lado de la otra. Confirmá la de quien se lo comprás, y en la otra tocá <b>“No se lo compramos a …”</b>:
+  no vuelve a preguntar.</p>
+</div>
+
+<h2>🔍 De dónde sale cada costo</h2>
+<div class="caja">
+  <p style="margin-top:0">En la revisión, en la lista final y en el reporte, cada costo dice de qué proveedor, de qué mensaje o lista
+  y, en las listas, con qué código. Si un costo quedó mal, así se sabe de dónde vino.</p>
+  <p style="margin-bottom:0">Todo lo que se manda a Odoo queda en el <a href="{{ url_for('ver_memoria') }}#historial">historial</a>. El último
+  proveedor de cada producto es “a quien se lo comprás”. Por ejemplo, si un yogur de marca grande se lo comprás a un almacén y un día la marca
+  manda su propia lista, la app pregunta antes de usar ese precio.</p>
+</div>
+
+<h2>👀 La última mirada y la verificación</h2>
+<div class="caja">
+  <p style="margin-top:0">Antes de importar, la app muestra todo lo que va a cambiar, con lo raro arriba en amarillo: aumentos
+  grandes, bajas de precio, productos que no tenían costo. Como los márgenes son fijos, muestra también el <b>precio de venta
+  estimado</b>: el de hoy, movido en el mismo porcentaje que el costo, para ver a ojo si algo queda raro. Los proveedores con
+  margen variable (por ejemplo, bebidas que se precian aparte) se marcan en Proveedores. Para ellos se avisa si el costo nuevo queda por encima del precio de
+  venta de hoy o con menos de 10% de margen.</p>
+  <p style="margin-bottom:0">Después de importar, exportá otra vez de Odoo y subilo en <b>Verificar</b>. La app revisa que cada costo haya
+  quedado como tenía que quedar y que Odoo no haya creado productos repetidos.</p>
+</div>
+
+<h2>🔒 Las reglas de seguridad</h2>
+<div class="caja">
+  <ul style="margin:0">
+    <li>Si el export de Odoo no tiene la columna <b>id</b>, la app no sigue: importar sin esa columna crea productos duplicados.</li>
+    <li>Antes de generar el archivo se revisa que todos los productos tengan un ID de Odoo válido. Si alguno no lo tiene, no se genera.</li>
+    <li>Un mismo producto nunca entra dos veces al archivo.</li>
+    <li>El archivo solo lleva ID, referencia, nombre y costo. No lleva stock ni publicación.</li>
+  </ul>
+</div>
+
+<h2>🆘 Si algo sale mal</h2>
+<div class="caja">
+  <ul style="margin:0">
+    <li><b>Confirmé un producto equivocado</b>: en “Lo aprendido”, borrá esa fila y volvé a analizar.</li>
+    <li><b>La planilla de Google no se puede leer</b>: tiene que estar compartida como “Cualquier persona con el enlace: Lector”.
+      Si no, bajala como CSV y subila en “Otros”.</li>
+    <li><b>Una lista en PDF no se lee</b>: si es una foto o un escaneo, todavía no se puede. Pasá los precios como mensaje suelto.</li>
+    <li><b>La verificación marca algo</b>: “no se actualizó” suele ser una fila que Odoo rechazó. Volvé a importar el mismo archivo.
+      Si aparecen productos nuevos, revisalos en Odoo: pueden ser duplicados.</li>
+    <li><b>La app no abre</b>: cerrá la ventana negra y volvé a hacer doble clic en “Abrir actualizador”.</li>
+  </ul>
+</div>
+{% endblock %}

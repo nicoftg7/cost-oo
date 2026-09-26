@@ -1,0 +1,8 @@
+<form action="{{ url_for('subir_export') }}" method="post" enctype="multipart/form-data">
+  <label class="soltar">
+    <input type="file" name="export" accept=".csv,.xlsx,.xls" required>
+    Arrastrá acá el archivo exportado de Odoo, o hacé clic para buscarlo
+    <div class="elegidos"></div>
+  </label>
+  <button class="boton" type="submit">{{ boton_export }}</button>
+</form>

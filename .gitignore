@@ -1,0 +1,10 @@
+# datos reales del negocio: memorias, ciclo en curso y archivos generados
+datos/
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# datos del ejemplo que se regeneran cada vez que se abre
+ejemplo/datos_demo/

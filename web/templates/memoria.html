@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>🧠 Lo aprendido</h1>
+<p class="bajada">Cada vez que confirmás algo en pantalla, la app lo guarda acá. Por eso el mes siguiente
+pregunta menos. Si te equivocaste en una confirmación, borrala y la app vuelve a preguntar.</p>
+<p class="gris" style="margin-top:-10px">Para cambiar el nombre del negocio o el link de la planilla:
+  <a href="{{ url_for('bienvenida') }}">datos del negocio</a>.</p>
+
+{% set titulos = {
+  'alias': ('✍️ Cómo escribe cada proveedor', 'El texto del mensaje y el producto de Odoo que le corresponde.', ['texto', 'proveedor', 'referencia', 'nota']),
+  'codigos_proveedor': ('🔑 Códigos de las distribuidoras', 'El código de cada artículo en la lista de la distribuidora y el producto de Odoo. Sin referencia = no se lo compramos ahí.', ['proveedor', 'codigo_proveedor', 'descripcion_proveedor', 'referencia_odoo']),
+  'ignorar': ('🚫 Productos que no se venden', 'Los cotiza el proveedor pero no se venden: se saltean sin preguntar.', ['texto', 'proveedor', 'motivo']),
+  'aprobados': ('✅ Excepciones aprobadas', 'Cambios de presentación y variaciones fuertes ya confirmados.', ['referencia', 'tipo', 'motivo']),
+  'abreviaturas': ('🗣️ Abreviaturas y jerga del negocio', 'Cómo escriben tus proveedores algunas palabras. Por ejemplo, una distribuidora que recorta una marca ("bahi" = "bahia"). Si “significa” queda vacío, la palabra se ignora. La jerga común de Argentina (choris, merme, c/, s/) ya viene incluida.', ['texto', 'significa', 'nota']),
+  'no_son_productos': ('🚫 Filas del export que no son productos', 'Nombres de Odoo que empiezan así se dejan afuera: cuotas, bonos, tareas internas. Descuentos, envíos y tarjetas de regalo ya se excluyen solos.', ['empieza_con', 'nota']),
+} %}
+
+<h2 id="proveedores">🤝 Proveedores ({{ proveedores|length }})</h2>
+{% if guardado %}<div class="aviso">✓ Cambios guardados.</div>{% endif %}
+<p class="gris" style="margin-top:-6px">Los que aparecen para elegir al cargar un mensaje o una lista. Cuando escribís uno nuevo
+  al cargar algo, se agrega solo. “Otros nombres” sirve para apodos o siglas (por ejemplo, las siglas de una cooperativa), separados por |.</p>
+<details class="caja" {% if abrir_proveedores %}open{% endif %}>
+  <summary>Ver y editar</summary>
+  <p class="gris">Cambiá todo lo que necesites y tocá <b>Guardar cambios</b> una sola vez, al final.
+    <b>Margen</b>: “fijo” si el precio de venta sigue al costo (la mayoría); “variable” si se revisa aparte (por ejemplo, bebidas que se precian aparte).</p>
+  <form id="form-proveedores" action="{{ url_for('editar_proveedores') }}" method="post">
+  <div class="adentro tabla"><table>
+    <tr><th>Proveedor</th><th>Otros nombres</th><th>Cómo manda precios</th><th>IVA de sus listas</th><th>Margen</th></tr>
+    {% for p in proveedores %}
+    <tr>
+      <td><b>{{ p.nombre }}</b><input type="hidden" name="nombre" value="{{ p.nombre }}"></td>
+      <td><input name="alias" value="{{ p.alias|join('|') }}" style="width:100%"></td>
+      <td><select name="tipo">
+        {% for v, t in [('', '—'), ('mensaje', 'Mensaje'), ('lista', 'Lista'), ('manual', 'A mano')] %}
+        <option value="{{ v }}" {{ 'selected' if p.tipo == v }}>{{ t }}</option>{% endfor %}</select></td>
+      <td><select name="iva"><option value="">—</option>
+        {% for v, t in iva_opciones.items() %}<option value="{{ v }}" {{ 'selected' if p.iva == v }}>{{ t }}</option>{% endfor %}</select></td>
+      <td><select name="margen">
+        {% for v, t in [('fijo', 'Fijo'), ('variable', 'Variable')] %}
+        <option value="{{ v }}" {{ 'selected' if (p.margen or 'fijo') == v }}>{{ t }}</option>{% endfor %}</select></td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  <div class="guardar-fijo" id="guardar-proveedores" hidden>
+    <span>Hay cambios sin guardar.</span>
+    <button class="boton verde" type="submit">✓ Guardar cambios</button>
+  </div>
+  </form>
+  <form action="{{ url_for('editar_proveedor') }}" method="post" class="fila-form" style="margin-top:10px">
+    <input type="hidden" name="accion" value="agregar">
+    <input name="nombre" placeholder="Agregar un proveedor nuevo" required>
+    <button class="boton chico" type="submit">+ Agregar</button>
+  </form>
+</details>
+
+{% for nombre, (titulo, bajada, cols) in titulos.items() %}
+<h2 id="{{ nombre }}">{{ titulo }} ({{ tablas[nombre]|length }})</h2>
+<p class="gris" style="margin-top:-6px">{{ bajada }}</p>
+<details class="caja" {% if tablas[nombre]|length < 15 %}open{% endif %}>
+  <summary>Ver la lista</summary>
+  <div class="adentro tabla"><table>
+    <tr>{% for c in cols %}<th>{{ c|capitalize }}</th>{% endfor %}<th></th></tr>
+    {% for r in tablas[nombre]|reverse %}
+    <tr>{% for c in cols %}<td>{{ r[c] }}</td>{% endfor %}
+      <td><form action="{{ url_for('borrar_memoria') }}" method="post" onsubmit="return confirm('¿Borrar esta fila? La app va a volver a preguntar por este caso.')">
+        <input type="hidden" name="tabla" value="{{ nombre }}"><input type="hidden" name="fila" value="{{ r['index'] }}">
+        <button class="boton link" type="submit">✕ Borrar</button></form></td></tr>
+    {% endfor %}
+  </table></div>
+  {% if nombre == 'abreviaturas' %}
+  <form action="{{ url_for('agregar_memoria') }}" method="post" class="fila-form" style="margin-top:10px">
+    <input type="hidden" name="tabla" value="abreviaturas">
+    <input name="texto" placeholder="Cómo lo escriben (ej: bahi)" required>
+    <input name="significa" placeholder="Qué significa (ej: bahia)">
+    <input name="nota" placeholder="Nota (opcional)">
+    <button class="boton chico" type="submit">+ Agregar</button>
+  </form>
+  {% elif nombre == 'no_son_productos' %}
+  <form action="{{ url_for('agregar_memoria') }}" method="post" class="fila-form" style="margin-top:10px">
+    <input type="hidden" name="tabla" value="no_son_productos">
+    <input name="empieza_con" placeholder="El nombre empieza con… (ej: cuota social)" required>
+    <input name="nota" placeholder="Nota (opcional)">
+    <button class="boton chico" type="submit">+ Agregar</button>
+  </form>
+  {% elif nombre == 'codigos_proveedor' %}
+  <form action="{{ url_for('agregar_memoria') }}" method="post" class="fila-form" style="margin-top:10px">
+    <input type="hidden" name="tabla" value="codigos_proveedor">
+    <input name="proveedor" placeholder="Distribuidora" required>
+    <input name="codigo_proveedor" placeholder="Código en su lista" required>
+    <input name="descripcion_proveedor" placeholder="Cómo lo describe (opcional)">
+    <input list="productos" name="buscado" placeholder="Producto de Odoo…" required style="min-width:220px">
+    <button class="boton chico" type="submit">+ Agregar</button>
+  </form>
+  {% if not productos %}<p class="gris" style="margin:6px 0 0">Para buscar el producto hace falta un export de Odoo cargado
+    (empezá un ciclo, aunque sea de práctica).</p>{% endif %}
+  {% endif %}
+</details>
+{% endfor %}
+
+<h2 id="historial">📜 Historial de costos ({{ conteos.historial }})</h2>
+<p class="gris" style="margin-top:-6px">Cada costo que se mandó a Odoo y de dónde salió. El último de cada producto dice a quién se
+  le compra: si otro proveedor o lista cotiza ese producto, la app pregunta antes de usarlo.</p>
+<details class="caja">
+  <summary>Ver los últimos {{ historial|length }}</summary>
+  <div class="adentro tabla"><table>
+    <tr><th>Fecha</th><th>Producto</th><th class="num">Antes</th><th class="num">Nuevo</th><th>Fuente</th><th>Origen</th><th>Estado</th></tr>
+    {% for r in historial %}<tr><td>{{ r.fecha }}</td><td>{{ r.producto }}</td><td class="num">{{ r.costo_anterior|pesos }}</td>
+      <td class="num">{{ r.costo_nuevo|pesos }}</td><td>{{ r.fuente }}</td><td class="gris">{{ r.origen }}</td><td>{{ r.estado }}</td></tr>{% endfor %}
+  </table></div>
+</details>
+
+<datalist id="productos">
+  {% for p in productos %}<option value="{{ p }}">{% endfor %}
+</datalist>
+
+<h2>🗂️ Las otras memorias</h2>
+<div class="caja">
+  <p style="margin-top:0">Estas cambian poco y se editan con Excel, en la carpeta <code>datos\memoria</code>:</p>
+  <ul>
+    <li><b>proveedor_alias.csv</b> ({{ conteos.proveedor_alias }}): apodos de proveedores (“La Quesera” es “Lácteos Don Julio”).</li>
+    <li><b>reglas_proveedor.csv</b> ({{ conteos.reglas_proveedor }}): quién cotiza por kilo y quién sin IVA.</li>
+    <li><b>impuestos.csv</b> ({{ conteos.impuestos }}): impuestos a sumar a quien manda precios sin impuestos (0.21 = 21%).</li>
+    <li><b>rotaciones.csv</b> ({{ conteos.rotaciones }}): variantes que el proveedor alterna.</li>
+  </ul>
+  <p class="gris" style="margin-bottom:0">Cerrá la app antes de editarlos y guardalos como CSV.</p>
+</div>
+<script>
+(function () {
+  var form = document.getElementById('form-proveedores');
+  if (!form) return;
+  var barra = document.getElementById('guardar-proveedores'), sucio = false;
+  form.addEventListener('input', marcar);
+  form.addEventListener('change', marcar);
+  function marcar(ev) {
+    sucio = true; barra.hidden = false;
+    var fila = ev.target.closest('tr'); if (fila) fila.classList.add('editada');
+  }
+  form.addEventListener('submit', function () { sucio = false; });
+  window.addEventListener('beforeunload', function (ev) { if (sucio) { ev.preventDefault(); ev.returnValue = ''; } });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% macro variacion(v) -%}
+  {%- if v == v and v is not none -%}
+    <span class="{{ 'sube' if v > 0 else 'baja' if v < 0 else 'gris' }}">{{ v|pct }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% block contenido %}
+{% if error and not verificacion %}
+  <h1>{{ 'No se generó el archivo' if not archivos.import else 'Algo salió mal' }}</h1>
+  <div class="error">{{ error }}</div>
+  {% if not archivos.import %}<p>Por seguridad la app prefiere no generar nada antes que generar un archivo que duplique productos en Odoo.</p>{% endif %}
+{% else %}
+  <h1>{{ 'Resultado de la verificación' if verificacion else 'Archivo listo' }}</h1>
+{% endif %}
+
+{# ---------- resultado de la verificación ---------- #}
+{% if verificacion %}
+  {% set v = verificacion %}
+  {% if v.todo_bien %}
+    <div class="ok-grande">✓ Los {{ v.total }} costos quedaron bien en Odoo y no se creó ningún producto nuevo.</div>
+  {% else %}
+    <div class="mal-grande">⚠️ Hay cosas para revisar en Odoo.</div>
+  {% endif %}
+  <div class="resumen">
+    <div class="cifra {{ 'verde' if v.ok == v.total else 'ambar' }}"><b>{{ v.ok }} de {{ v.total }}</b>costos quedaron como tenían que quedar</div>
+    <div class="cifra {{ 'verde' if v.productos_despues == v.productos_antes else 'ambar' }}"><b>{{ v.productos_antes }} → {{ v.productos_despues }}</b>productos en Odoo (antes → ahora)</div>
+  </div>
+
+  {% if v.nuevos|length %}
+  <div class="error"><b>Odoo tiene {{ v.nuevos|length }} productos que no estaban antes.</b>
+Si no los creaste vos a mano, el import puede haber duplicado productos en vez de actualizarlos. Revisalos en Odoo y archivalos si están repetidos.</div>
+  <div class="tabla"><table><tr><th>Producto nuevo</th><th>ID externo</th><th class="num">Costo</th></tr>
+    {% for r in v.nuevos.to_dict('records') %}<tr><td>{{ r.nombre_completo }}</td><td class="gris">{{ r.id_externo }}</td><td class="num">{{ r.costo_actual|pesos }}</td></tr>{% endfor %}
+  </table></div>
+  {% endif %}
+
+  {% if v.problemas|length %}
+  <h2>Costos que no quedaron bien ({{ v.problemas|length }})</h2>
+  <div class="tabla"><table><tr><th>Producto</th><th class="num">Tenía que quedar</th><th class="num">Quedó</th><th>Qué pasó</th></tr>
+    {% for r in v.problemas.to_dict('records') %}<tr class="raro"><td>{{ r.name }}</td><td class="num">{{ r.standard_price|pesos }}</td><td class="num">{{ r.costo_en_odoo|pesos }}</td><td>{{ r.estado }}</td></tr>{% endfor %}
+  </table></div>
+  <p class="gris">“No se actualizó” suele ser una fila que Odoo rechazó al importar: volvé a importar el mismo archivo y verificá de nuevo.</p>
+  {% endif %}
+
+  {% if v.otros_cambios|length %}
+  <details class="caja"><summary>Productos que cambiaron de costo sin estar en el archivo ({{ v.otros_cambios|length }})</summary>
+    <div class="adentro"><p class="gris" style="margin-top:0">Puede ser alguien que los cambió a mano en Odoo mientras tanto. Si no, vale la pena mirarlos.</p>
+    <div class="tabla"><table><tr><th>Producto</th><th class="num">Antes</th><th class="num">Ahora</th></tr>
+      {% for r in v.otros_cambios.to_dict('records') %}<tr><td>{{ r.producto }}</td><td class="num">{{ r.antes|pesos }}</td><td class="num">{{ r.ahora|pesos }}</td></tr>{% endfor %}
+    </table></div></div>
+  </details>
+  {% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% endif %}
+
+{% if not verificacion %}
+<div class="caja">
+  {% if archivos.import %}
+  <p style="margin-top:0">{{ listos }} productos con costo nuevo.{% if pendientes %} Quedaron {{ pendientes }} sin confirmar, que no están incluidos.{% endif %}</p>
+  <p><a class="boton {{ 'claro' if practica else 'verde' }} grande" href="{{ url_for('descargar', nombre=archivos.import) }}">
+      ⬇️ {{ 'Descargar la práctica (no se importa)' if practica else 'Descargar archivo para importar' }}</a>
+    <br><span class="gris">{{ archivos.import.split('/')[-1] }}</span></p>
+  {% endif %}
+  <p style="margin-bottom:0">
+    {% if archivos.reporte %}<a href="{{ url_for('descargar', nombre=archivos.reporte) }}">📊 Reporte completo del ciclo (Excel)</a>{% endif %}
+    {% if archivos.rotacion %} · <a href="{{ url_for('descargar', nombre=archivos.rotacion) }}">🔀 Cambios de publicación sugeridos (opcional)</a>{% endif %}
+    <span class="gris"> · también quedan en la carpeta <code>datos\salidas</code>.</span>
+  </p>
+</div>
+{% endif %}
+
+{% if control %}
+<h2>{{ '✅ Lo que se importó' if verificacion else '👀 Mirá la lista una última vez' }}</h2>
+<p class="gris" style="margin-top:-6px">{% if a_revisar %}Arriba, marcado en amarillo, lo que conviene mirar: <b>{{ a_revisar }}</b> productos.
+  {% endif %}Si algo te parece raro, volvé a la revisión y sacalo antes de importar. Cada fila dice de qué mensaje o lista salió el costo.
+  El precio de venta estimado es el de hoy movido en el mismo porcentaje que el costo (margen fijo); los proveedores
+  con margen variable (se marcan en <a href="{{ url_for('ver_memoria') }}#proveedores">Proveedores</a>) se comparan contra el precio de hoy.</p>
+<div class="tabla"><table>
+  <tr><th>Producto</th><th class="num">Costo antes</th><th class="num">Costo nuevo</th><th class="num">Cambio</th>
+      <th class="num">Precio de venta<br><span class="gris" style="font-weight:400">hoy → estimado</span></th><th class="num">Margen</th><th>De dónde sale</th></tr>
+  {% for r in control %}
+  <tr class="{{ 'raro' if r.revisar }}">
+    <td>{{ r.producto }}{% if r.revisar %}<br><span class="marca-raro">⚠ {{ r.revisar }}</span>{% endif %}</td>
+    <td class="num">{{ r.costo_antes|pesos }}</td>
+    <td class="num"><b>{{ r.costo_nuevo|pesos }}</b></td>
+    <td class="num">{{ variacion(r['variacion_%']) }}</td>
+    <td class="num">{% if r.margen == 'variable' %}{{ r.precio_venta|pesos }}<br><span class="gris">margen variable: no se estima</span>
+      {% elif r.precio_venta_estimado|vacio %}{{ r.precio_venta|pesos }} → <b>{{ r.precio_venta_estimado|pesos }}</b>
+      {% else %}{{ r.precio_venta|pesos }}{% endif %}</td>
+    <td class="num">{% if r['margen_%']|vacio != '' %}{{ r['margen_%'] }}%{% endif %}</td>
+    <td><span class="fuente"><b>{{ r.fuente }}</b>{% if r.origen %} · {{ r.origen }}{% endif %}{% if r.codigo|vacio %} · cód. {{ r.codigo }}{% endif %}</span><br><span class="gris">“{{ r.dice }}”</span></td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+
+{% if practica %}
+<div class="aviso" style="margin-top:20px"><b>🧪 Esto es una práctica.</b> El archivo es solo para mirarlo: no lo importes en Odoo.
+  Lo que confirmaste durante la revisión ya quedó aprendido para el ciclo real.</div>
+{% endif %}
+
+{% if archivos.import and not verificacion and not practica %}
+<h2>📥 Cómo importarlo en Odoo</h2>
+<div class="caja">
+  <ol class="pasos">
+    <li>En Odoo, entrá a <b>Productos</b> en vista de <b>lista</b>.</li>
+    <li>Abrí el menú del engranaje <b>⚙</b> al lado del título “Productos” (en versiones anteriores, el menú <b>Favoritos</b>) y elegí <b>Importar registros</b>.</li>
+    <li>Subí el archivo <b>{{ archivos.import }}</b>.</li>
+    <li>Revisá que cada columna esté reconocida así:
+      <ul>
+        <li><code>id</code> → <b>ID externo</b> (es la que hace que se actualice y no se dupliquen productos)</li>
+        <li><code>default_code</code> → Referencia interna</li>
+        <li><code>name</code> → Nombre</li>
+        <li><code>standard_price</code> → Costo</li>
+      </ul></li>
+    <li>Tocá <b>Probar</b>. Si no aparece ningún error, tocá <b>Importar</b>.</li>
+  </ol>
+</div>
+{% endif %}
+
+{% if archivos.import and not practica %}
+<h2 id="verificar">✓ {{ 'Verificar de nuevo' if verificacion else 'Después de importar: verificá' }}</h2>
+<div class="caja">
+  <p style="margin-top:0">Volvé a exportar los productos de Odoo (igual que al principio) y subí ese export nuevo.
+    La app compara producto por producto que el costo haya quedado bien y que Odoo no haya creado productos repetidos.</p>
+  <form action="{{ url_for('verificar_import') }}" method="post" enctype="multipart/form-data">
+    <label class="soltar">
+      <input type="file" name="export" accept=".csv,.xlsx,.xls" required>
+      Arrastrá acá el export nuevo de Odoo
+      <div class="elegidos"></div>
+    </label>
+    <button class="boton" type="submit">✓ Verificar</button>
+  </form>
+</div>
+{% endif %}
+
+<p style="margin-top:28px"><a href="{{ url_for('revisar') }}">← Volver a la revisión</a> · <a href="{{ url_for('inicio') }}">Inicio</a></p>
+
+<script>
+document.querySelectorAll('.soltar').forEach(function (zona) {
+  var input = zona.querySelector('input'), lista = zona.querySelector('.elegidos');
+  ['dragenter', 'dragover'].forEach(function (ev) { zona.addEventListener(ev, function () { zona.classList.add('encima'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { zona.addEventListener(ev, function () { zona.classList.remove('encima'); }); });
+  input.addEventListener('change', function () { lista.textContent = Array.from(input.files).map(function (f) { return f.name; }).join(' · '); });
+});
+</script>
+{% endblock %}

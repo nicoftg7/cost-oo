@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Actualizar costos</h1>
+<p class="bajada">Cargá el export de Odoo y lo que mandaron los proveedores: la planilla de mensajes,
+un mensaje suelto o una lista de precios. La app encuentra cada producto y arma el archivo para
+importar. Lo que no pueda resolver sola te lo pregunta.</p>
+
+{% if modo_ejemplo %}
+<div class="caja" style="border-color:#e0b64a">
+  <h3>🧪 Probar con el almacén de ejemplo</h3>
+  <p style="margin-top:0">Carga de una el export de Odoo, la planilla de mensajes y dos listas de distribuidoras
+    (una en PDF y otra en Excel) de un almacén inventado. Los precios nuevos son un 10% más altos, como si fuera el ciclo
+    siguiente. La primera vez la app te va a preguntar algunas cosas. Respondé y volvé a analizar: vas a ver cómo aprende.</p>
+  <form action="{{ url_for('cargar_ejemplo') }}" method="post"><button class="boton verde" type="submit">🧪 Cargar el ejemplo y analizar</button></form>
+</div>
+{% endif %}
+
+{% if error %}<div class="error"><b>No se pudo seguir.</b>
+{{ error }}</div>{% endif %}
+{% if aviso %}<div class="aviso">{{ aviso }}</div>{% endif %}
+
+<datalist id="proveedores">{% for p in proveedores %}<option value="{{ p.nombre }}">{% endfor %}</datalist>
+
+{# ---------- 1. export ---------- #}
+<div class="caja paso">
+  <div class="num">1</div>
+  <div>
+    <h3>📥 El export de productos de Odoo</h3>
+    {% if estado and estado.export and cat %}
+      <p class="listo">✓ <b>{{ estado.export_original }}</b>: {{ cat.productos }} productos de {{ cat.proveedores }} proveedores
+        <span class="gris">(cargado {{ estado.export_cargado }})</span></p>
+      <details><summary>Cargar otro export</summary><div class="adentro">
+        {% set boton_export = "Reemplazar" %}{% include "_subir_export.html" %}
+      </div></details>
+    {% else %}
+      <p class="gris" style="margin:0">Exportado con la casilla <b>“Quiero actualizar datos (exportación compatible con importación)”</b> tildada.</p>
+      {% set boton_export = "Cargar export" %}{% include "_subir_export.html" %}
+    {% endif %}
+    <details>
+      <summary>¿Cómo exporto de Odoo?</summary>
+      <div class="adentro">
+        <ol class="pasos">
+          <li>En Odoo, entrá a <b>Productos</b> y cambiá a la vista de <b>lista</b>.</li>
+          <li>Tildá la casilla del encabezado para seleccionar todos (y después <b>“Seleccionar todos”</b> si Odoo lo ofrece).</li>
+          <li><b>Acción → Exportar</b>.</li>
+          <li>Tildá <b>“Quiero actualizar datos (exportación compatible con importación)”</b>. Es la parte importante.</li>
+          <li>Campos: Nombre, Referencia interna, Costo, <b>Precio de venta</b>, Publicado, Cantidad a la mano.</li>
+          <li>Formato <b>CSV</b> o <b>XLSX</b>, y <b>Exportar</b>.</li>
+        </ol>
+        <p class="gris">Tip: guardá esa lista de campos como plantilla en Odoo (“Guardar como nueva plantilla”) y el mes que viene es un solo clic.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+{# ---------- 2. fuentes ---------- #}
+<div class="caja paso">
+  <div class="num">2</div>
+  <div>
+    <h3>📨 Lo que mandaron los proveedores</h3>
+    {% if estado and estado.fuentes %}
+      <ul class="fuentes">
+      {% for f in estado.fuentes %}
+        <li>
+          <span class="tipo">{{ {'planilla': 'Planilla', 'mensaje': 'Mensaje', 'lista': 'Lista', 'texto': 'Texto'}[f.tipo] }}</span>
+          <span>{{ f.nombre }}{% if f.tipo == 'lista' %} <span class="gris">· {{ f.proveedor }}</span>{% endif %}
+            {% if f.tipo == 'mensaje' %}<span class="gris">· “{{ f.texto[:70] }}{% if f.texto|length > 70 %}…{% endif %}”</span>{% endif %}
+            {% if f.listas_esperadas %}
+              {% set cargadas = estado.fuentes|selectattr('tipo', 'equalto', 'lista')|map(attribute='proveedor')|map('lower')|list %}
+              {% set faltan = [] %}{% for p in f.listas_esperadas %}{% if p.lower() not in cargadas %}{% set _ = faltan.append(p) %}{% endif %}{% endfor %}
+              <br><span class="gris">Mandan lista: {{ f.listas_esperadas|length }} proveedores{% if faltan %}; todavía no cargaste la de
+                {{ faltan|join(', ') }}{% else %}; están todas cargadas{% endif %}.</span>
+            {% endif %}
+            {% if f.manual %}<br><span class="gris">Se actualizan a mano: {% for p, ch in f.manual %}{{ p }}{{ ' ✓' if ch }}{{ ', ' if not loop.last }}{% endfor %}.</span>{% endif %}</span>
+          <form action="{{ url_for('quitar_fuente') }}" method="post"><input type="hidden" name="id" value="{{ f.id }}">
+            <button class="boton link" type="submit" title="Quitar">✕ Quitar</button></form>
+        </li>
+      {% endfor %}
+      </ul>
+      <p class="gris" style="margin:4px 0 0">Podés sumar más cosas al mismo ciclo:</p>
+    {% else %}
+      <p class="gris" style="margin:0">Elegí una o varias. Se pueden combinar en un mismo ciclo.</p>
+    {% endif %}
+
+    <details class="agregar" {% if not (estado and estado.fuentes) %}open{% endif %}>
+      <summary>📊 Planilla de mensajes (Google Sheets)</summary>
+      <div class="adentro">
+        {% if config.sheets_url %}
+          <form action="{{ url_for('fuente_sheets') }}" method="post">
+            <button class="boton" type="submit">🔄 Leer la planilla ahora</button>
+            <span class="gris">La app detecta qué mensajes son nuevos y cuáles ya se procesaron.</span>
+          </form>
+          <details><summary>Cambiar el link de la planilla</summary><div class="adentro">
+            <form action="{{ url_for('fuente_sheets') }}" method="post" class="fila-form">
+              <input type="url" name="url" value="{{ config.sheets_url }}" required>
+              <button class="boton claro" type="submit">Guardar y leer</button>
+            </form></div></details>
+        {% else %}
+          <p class="gris" style="margin-top:0">Pegá el link de la planilla (se guarda: el mes que viene es un clic).</p>
+          <form action="{{ url_for('fuente_sheets') }}" method="post" class="fila-form">
+            <input type="url" name="url" placeholder="https://docs.google.com/spreadsheets/d/…" required>
+            <button class="boton" type="submit">🔄 Leer la planilla</button>
+          </form>
+          <p class="gris">La planilla tiene que estar compartida: <b>Compartir → Acceso general → Cualquier persona con el enlace → Lector</b>.
+            Copiá el link con la pestaña de mensajes abierta.</p>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="agregar" {% if estado and estado.fuentes %}open{% endif %}>
+      <summary>📄 Listas de precios (PDF o Excel)</summary>
+      <div class="adentro">
+        <form action="{{ url_for('fuente_lista') }}" method="post" enctype="multipart/form-data" id="form-listas">
+          <label class="soltar">
+            <input type="file" name="listas" accept=".pdf,.xlsx,.xls,.csv" multiple required id="archivos-listas">
+            Arrastrá acá una o varias listas, o hacé clic para buscarlas
+          </label>
+          <div id="filas-listas"></div>
+          <button class="boton" type="submit" id="boton-listas" hidden>+ Agregar listas</button>
+        </form>
+        <p class="gris">Para cada lista elegís de qué proveedor es. Si no está en la lista, escribí el nombre y queda guardado.
+          La primera vez la app te pregunta qué artículo es cada producto tuyo y aprende el código. Desde la próxima, entra solo.</p>
+      </div>
+    </details>
+
+    <details class="agregar">
+      <summary>💬 Un mensaje suelto</summary>
+      <div class="adentro">
+        <form action="{{ url_for('fuente_mensaje') }}" method="post">
+          <label class="campo">¿De qué proveedor es?
+            <input name="proveedor" list="proveedores" required placeholder="Empezá a escribir el nombre (si es nuevo, se guarda)"></label>
+          <label class="campo">El mensaje, tal cual llegó
+            <textarea name="texto" required placeholder="Hola! Te paso los precios&#10;Galletitas $2700&#10;Budines $5600"></textarea></label>
+          <button class="boton" type="submit">+ Agregar mensaje</button>
+        </form>
+      </div>
+    </details>
+
+    <details class="agregar">
+      <summary>📎 Otros: planilla bajada como CSV, archivo de texto o texto pegado</summary>
+      <div class="adentro">
+        <form action="{{ url_for('fuente_archivo') }}" method="post" enctype="multipart/form-data">
+          <label class="soltar">
+            <input type="file" name="archivos" accept=".csv,.txt" multiple required>
+            Arrastrá acá la planilla (.csv) o un .txt
+            <div class="elegidos"></div>
+          </label>
+          <button class="boton claro" type="submit">+ Agregar archivos</button>
+        </form>
+        <form action="{{ url_for('fuente_texto') }}" method="post" style="margin-top:14px">
+          <p class="gris" style="margin:0">…o pegá mensajes de varios proveedores: el nombre del proveedor en una línea y debajo su mensaje.</p>
+          <textarea name="texto" placeholder="Panadería Norte&#10;empanadas $10500&#10;&#10;Pastas Río&#10;- Naturales $3600"></textarea>
+          <button class="boton claro" type="submit">+ Agregar texto</button>
+        </form>
+      </div>
+    </details>
+  </div>
+</div>
+
+{# ---------- 3. analizar ---------- #}
+<div class="caja paso">
+  <div class="num">3</div>
+  <div>
+    {% if estado and estado.export and estado.fuentes %}
+      <a class="boton verde grande" href="{{ url_for('revisar') }}" id="analizar">🔍 Analizar</a>
+      <span class="gris" id="esperando" hidden>Analizando… una lista grande tarda unos segundos.</span>
+    {% else %}
+      <button class="boton verde grande" disabled style="opacity:.5">🔍 Analizar</button>
+      <span class="gris">Primero cargá el export y al menos una fuente de precios.</span>
+    {% endif %}
+  </div>
+</div>
+
+<details class="caja" style="margin-top:20px">
+  <summary>🔁 Empezar un ciclo nuevo{{ ' (el actual es de práctica)' if practica }}</summary>
+  <div class="adentro">
+    <form action="{{ url_for('nuevo') }}" method="post"
+          onsubmit="return confirm('¿Empezar un ciclo nuevo? Se borra lo cargado en este ciclo (lo aprendido no se pierde).')">
+      <label style="display:block; margin:6px 0"><input type="checkbox" name="practica" value="1">
+        <b>Ciclo de práctica</b>: para ensayar con listas o mensajes viejos.</label>
+      <label style="display:block; margin:6px 0 12px 24px">Subir los precios un
+        <input name="subir" value="10" size="3" style="width:4em"> % para que parezcan un ciclo nuevo.</label>
+      <p class="gris" style="margin:0 0 10px">En práctica, lo que confirmás (qué producto es, códigos, IVA, bultos) se aprende
+        para el uso real. No se guarda historial, no se marcan mensajes como procesados, y el archivo sale como
+        “PRACTICA - NO IMPORTAR”.</p>
+      <button class="boton claro" type="submit">🔁 Empezar ciclo nuevo</button>
+    </form>
+  </div>
+</details>
+
+<p class="gris" style="margin-top:24px">La app ya aprendió {{ memoria.alias }} formas de escribir productos,
+{{ memoria.codigos_proveedor }} códigos de distribuidoras, {{ memoria.ignorar }} productos que no se venden y
+{{ memoria.aprobados }} excepciones. <a href="{{ url_for('ver_memoria') }}">Ver lo aprendido</a>.</p>
+
+<script>
+document.querySelectorAll('.soltar').forEach(function (zona) {
+  var input = zona.querySelector('input');
+  var lista = zona.querySelector('.elegidos');
+  ['dragenter', 'dragover'].forEach(function (ev) { zona.addEventListener(ev, function () { zona.classList.add('encima'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { zona.addEventListener(ev, function () { zona.classList.remove('encima'); }); });
+  input.addEventListener('change', function () {
+    if (lista) lista.textContent = Array.from(input.files).map(function (f) { return f.name; }).join(' · ');
+  });
+});
+
+// ---- listas: una fila por archivo, con su proveedor y el IVA ----
+var PROVEEDORES = {{ proveedores|tojson }};
+var IVA_ORDEN = {{ iva_opciones.items()|list|tojson }};   // en el orden de la app, no alfabético
+var IVA = {};
+IVA_ORDEN.forEach(function (par) { IVA[par[0]] = par[1]; });
+function normal(s) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function buscar(nombre) {
+  var k = normal(nombre);
+  return PROVEEDORES.find(function (p) {
+    return [p.nombre].concat(p.alias).some(function (a) { return normal(a) === k; });
+  });
+}
+// el nombre del archivo suele decir de quién es ("LISTA REGIONAL TRADE ..."): se propone, y se ve
+function adivinar(archivo) {
+  var palabras = ' ' + normal(archivo.replace(/\.[a-z]+$/i, '')) + ' ';
+  var mejor = null, largo = 0;
+  PROVEEDORES.forEach(function (p) {
+    [p.nombre].concat(p.alias).forEach(function (a) {
+      var k = normal(a);
+      if (k.length >= 3 && palabras.indexOf(' ' + k + ' ') >= 0 && k.length > largo) { mejor = p.nombre; largo = k.length; }
+    });
+  });
+  return mejor || '';
+}
+function filaIva(fila, nombre) {
+  var p = buscar(nombre), caja = fila.querySelector('.iva');
+  if (p && p.iva) {
+    caja.innerHTML = '<span class="gris">IVA: ' + IVA[p.iva] + '</span> <a href="#" class="cambiar">cambiar</a>' +
+                     '<input type="hidden" name="iva" value="">';
+    caja.querySelector('.cambiar').onclick = function (ev) { ev.preventDefault(); caja.innerHTML = selectorIva(p.iva); };
+  } else {
+    caja.innerHTML = selectorIva('');
+  }
+}
+function selectorIva(valor) {
+  var s = '<select name="iva" required><option value="">¿Los precios incluyen IVA?</option>';
+  IVA_ORDEN.forEach(function (par) { s += '<option value="' + par[0] + '"' + (par[0] === valor ? ' selected' : '') + '>' + par[1] + '</option>'; });
+  return s + '</select>';
+}
+var archivos = document.getElementById('archivos-listas');
+if (archivos) archivos.addEventListener('change', function () {
+  var cont = document.getElementById('filas-listas');
+  cont.innerHTML = '';
+  Array.from(archivos.files).forEach(function (f) {
+    var fila = document.createElement('div');
+    fila.className = 'fila-lista';
+    fila.innerHTML = '<div class="archivo"></div>' +
+      '<input name="proveedor" list="proveedores" required placeholder="¿De qué proveedor es?">' +
+      '<div class="iva"></div>';
+    fila.querySelector('.archivo').textContent = f.name;
+    var inp = fila.querySelector('input');
+    inp.value = adivinar(f.name);
+    filaIva(fila, inp.value);
+    inp.addEventListener('change', function () { filaIva(fila, inp.value); });
+    cont.appendChild(fila);
+  });
+  document.getElementById('boton-listas').hidden = archivos.files.length === 0;
+});
+var boton = document.getElementById('analizar');
+if (boton) boton.addEventListener('click', function () { document.getElementById('esperando').hidden = false; });
+</script>
+{% endblock %}

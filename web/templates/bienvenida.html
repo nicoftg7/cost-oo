@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>👋 Bienvenido</h1>
+<p class="bajada">Esta app lee los precios que mandan tus proveedores (mensajes de WhatsApp, planillas, listas en PDF o
+Excel), encuentra cada producto en tu Odoo y arma el archivo para actualizar los costos. Antes de empezar, contale
+tres cosas de tu negocio. Todo se puede cambiar después.</p>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<form action="{{ url_for('bienvenida') }}" method="post" enctype="multipart/form-data">
+  <div class="caja paso">
+    <div class="num">1</div>
+    <div>
+      <h3>¿Cómo se llama tu negocio?</h3>
+      <p class="gris" style="margin:0">Aparece arriba en la app. Es opcional.</p>
+      <label class="campo"><input name="negocio" value="{{ config.negocio or '' }}" placeholder="Ej: Almacén Cooperativo del Barrio"></label>
+    </div>
+  </div>
+
+  <div class="caja paso">
+    <div class="num">2</div>
+    <div>
+      <h3>¿Quiénes son tus proveedores?</h3>
+      <p class="gris" style="margin:0">Uno por línea. Si alguno tiene sigla o apodo, ponelo después de un guion:
+        <code>Cooperativa Agrícola del Sur - CAS</code>. Si te olvidás de alguno, lo escribís cuando cargues su mensaje o
+        su lista y queda guardado.</p>
+      <textarea name="proveedores" placeholder="Distribuidora Norte&#10;Panadería La Espiga&#10;Cooperativa Agrícola del Sur - CAS"></textarea>
+      <label class="soltar">
+        <input type="file" name="archivo_proveedores" accept=".txt,.csv">
+        …o arrastrá un archivo de texto con la lista
+        <div class="elegidos"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="caja paso">
+    <div class="num">3</div>
+    <div>
+      <h3>¿Anotás los mensajes de los proveedores en una planilla de Google?</h3>
+      <p class="gris" style="margin:0">Opcional. Si la usás, pegá el link: la app la lee con un clic. Tiene que tener una pestaña
+        con las columnas <b>Proveedor</b> y <b>Mensaje</b>, y estar compartida como “Cualquier persona con el enlace: Lector”.
+        Si no usás planilla, podés pegar los mensajes o subir las listas directamente.</p>
+      <label class="campo"><input type="url" name="url" value="{{ config.sheets_url or '' }}"
+                                  placeholder="https://docs.google.com/spreadsheets/d/…"></label>
+    </div>
+  </div>
+
+  <p><button class="boton verde grande" type="submit">🚀 Empezar</button></p>
+</form>
+
+<script>
+document.querySelectorAll('.soltar').forEach(function (zona) {
+  var input = zona.querySelector('input'), lista = zona.querySelector('.elegidos');
+  ['dragenter', 'dragover'].forEach(function (ev) { zona.addEventListener(ev, function () { zona.classList.add('encima'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { zona.addEventListener(ev, function () { zona.classList.remove('encima'); }); });
+  input.addEventListener('change', function () { if (lista) lista.textContent = Array.from(input.files).map(function (f) { return f.name; }).join(' · '); });
+});
+</script>
+{% endblock %}
