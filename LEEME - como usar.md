@@ -6,7 +6,7 @@ nunca el precio de venta, el stock ni la publicación.
 
 ## Descargarla
 
-1. Entrá a https://github.com/nicoftg7/costos-odoo, tocá el botón verde **Code** y después
+1. Entrá a https://github.com/nicoftg7/cost-oo, tocá el botón verde **Code** y después
    **Download ZIP**.
 2. En la carpeta de Descargas, clic derecho sobre el ZIP → **Extraer todo**, y elegí dónde
    dejar la carpeta (por ejemplo, en Documentos). **No abras la app desde adentro del ZIP**:
