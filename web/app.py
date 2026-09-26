@@ -24,6 +24,7 @@ from core.output import (control, escribir_import, escribir_reporte, escribir_ro
                          filas_historial, tabla_import)
 from core.parse import huella
 from core.pricelist import leer_lista
+from core.normalize import normalizar
 from core.providers import indice_proveedores
 from core import sheets
 from core.verify import verificar
@@ -617,6 +618,12 @@ def decidir():
         if buscado:          # eligió con el buscador: se busca la referencia por nombre
             cat = catalogo(e)
             hit = cat[cat.nombre_completo == buscado]
+            if not len(hit):
+                # el navegador no siempre completa el valor exacto de la lista (mayúsculas,
+                # tildes, espacios de más si se tipeó a mano): comparar ignorando eso antes
+                # de rendirse. Sin esto, un producto tipeado "distinto" no encontraba nada
+                # y la elección se perdía en silencio, sin avisar.
+                hit = cat[cat.nombre_completo.map(normalizar) == normalizar(buscado)]
             if len(hit):
                 ref = hit.iloc[0]["referencia"]
         if ref:

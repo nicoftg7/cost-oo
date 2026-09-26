@@ -223,3 +223,20 @@ def test_elegir_producto_aprende_alias(cliente):
     assert (alias.referencia == "PAS002").any()
     _, res = modulo.resultado()
     assert list(res["listos"].referencia) == ["PAS002"]
+
+
+def test_elegir_por_buscador_no_falla_por_mayusculas_o_tildes(cliente):
+    """El buscador de 'no es este producto' comparaba el texto tipeado contra el catálogo
+    letra por letra: si no coincidía EXACTO (mayúsculas, tildes, un espacio de más porque
+    se tipeó a mano en vez de clickear la sugerencia del navegador), la elección se perdía
+    en silencio, sin avisar nada, y la tarjeta volvía a aparecer sin cambios."""
+    modulo, c = cliente
+    subir(c, export_df(), 'Proveedor,Chequeado,Mensaje\n"Pastas Río",TRUE,"Los de la casa $3800"\n')
+    _, res = modulo.resultado()
+    fila = res["confirmar"].iloc[0]
+    c.post("/decidir", data={"clave": fila["clave_renglon"], "accion": "elegir",
+                             "buscado": "FIDEOS  CON MIEL 500 G - PASTAS RIO"})
+    alias = modulo.memoria.leer("alias")
+    assert (alias.referencia == "PAS002").any()
+    _, res = modulo.resultado()
+    assert list(res["listos"].referencia) == ["PAS002"]

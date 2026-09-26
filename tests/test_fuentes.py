@@ -50,6 +50,30 @@ def test_lista_con_punto_decimal():
     assert filas[0]["descripcion"] == "ATUN BAHIA LOMITO NATUR 170GR"
 
 
+def test_lista_con_descuento_sin_codigo_interno_usa_el_codigo_de_barras():
+    """'lista, descuento y neto' se leía solo si además del código de barras venía un
+    código interno corto ('01-0112'). Una lista real de un proveedor que solo usa el
+    código de barras (sin código interno propio) no matcheaba nada y se perdía entera."""
+    filas, no_leidos = renglones_de_texto([
+        "7795933000496 Atún Lomitos en Aceite/Agua (Ecu) 88 48 x 170 grs. 1,721.00 18.78% 1397,88",
+    ])
+    assert not no_leidos
+    assert filas[0]["codigo"] == "7795933000496"
+    assert filas[0]["precio"] == 1397.88
+
+
+def test_lista_con_un_precio_sin_separador_de_miles_no_arruina_los_demas():
+    """Un precio mandado sin el separador de miles que el resto de la lista sí usa
+    ('1397,88' en una lista que en todo lo demás escribe '1,808.13') hacía que la
+    detección global del separador decimal se confundiera y leyera mal los precios
+    que sí estaban bien escritos."""
+    filas, _ = renglones_de_texto([
+        "7795933000496 Atún Lomitos (Ecu) 48 x 170 grs. 1,721.00 18.78% 1397,88",
+        "7795933000502 01-0112 Atún Lomitos al Natural (Ecuador) 48 x 170 grs. 2,226.21 18.78% 1,808.13",
+    ])
+    assert [f["precio"] for f in filas] == [1397.88, 1808.13]
+
+
 def test_lista_avisa_renglones_que_no_pudo_leer():
     _, no_leidos = renglones_de_texto(["CUBE TRUMPET RESERV CABERN SAUVIGN 7814.282 6 NUEVO"])
     assert len(no_leidos) == 1

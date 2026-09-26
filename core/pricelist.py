@@ -27,13 +27,16 @@ from .providers import es_proveedor
 CODIGO = r"(?:[A-Za-z0-9]{1,4}-\d{3,6}|\d{3,7})"      # "O4-2001": a veces tipean la O por el 0
 # con $ el precio es inequívoco, así que el código puede ser corto: "1 TAPAS P/TORTAS FRITAS $895,00"
 CODIGO_CORTO = r"(?:[A-Za-z0-9]{1,4}-\d{3,6}|\d{1,7})"
-PRECIO_TXT = r"\d{1,3}(?:[.,]\d{3})*[.,]\d{2}"
+# con separador de miles ("1,808.13") o sin él, si el número entero no entra en 3 cifras
+# ("1397,88": una lista real lo mandó así, sin separador, para un monto de 4 dígitos)
+PRECIO_TXT = r"\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d{4,7}[.,]\d{2}"
 NUM = r"\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?"
 # 7795933000502 01-0112 Atún Lomitos al Natural (Ecuador) 88 48 x 170 grs. 2,226.21 18.78% [5.00%] 1,808.13
 # (código de barras opcional, precio de lista, uno o más descuentos, precio NETO al final)
 CON_DESCUENTO = re.compile(
-    rf"^\s*(?:\d{{8,14}}\s+)?({CODIGO})\s+(.+?)\s+({PRECIO_TXT})\s+(\d+(?:[.,]\d+)?%)"
-    rf"(?:\s+\d+(?:[.,]\d+)?%?)*\s+({PRECIO_TXT})\s*$")
+    rf"^\s*(?:(?P<barcode>\d{{8,14}})\s+)?(?:(?P<codigo>{CODIGO})\s+)?(?P<desc>.+?)\s+"
+    rf"(?P<lista>{PRECIO_TXT})\s+(?P<pct>\d+(?:[.,]\d+)?%)"
+    rf"(?:\s+\d+(?:[.,]\d+)?%?)*\s+(?P<neto>{PRECIO_TXT})\s*$")
 # 300 BONDIOLA 20472 7% 21905   (precio anterior, porcentaje, precio final; sin decimales)
 CON_PORCENTAJE = re.compile(rf"^\s*({CODIGO})\s+(.+?)\s+\$?\s*({NUM})\s+([+-]?\d+(?:[.,]\d+)?)\s*%\s+\$?\s*({NUM})\s*$")
 SIN_STOCK = re.compile(r"\b(?:SIN\s+STOCK|S/\s*STOCK)\b", re.I)
@@ -92,15 +95,21 @@ def limpiar_linea_pdf(l):
 def separador_decimal(crudos):
     """Mira todos los precios de la lista juntos para decidir qué es el punto.
     '2670.631' solo puede ser decimal (un separador de miles nunca tiene 4 cifras
-    antes); '2.598' y '14.294' solos son miles."""
-    for t in crudos:
-        t = t.replace(" ", "")
+    antes); '2.598' y '14.294' solos son miles.
+
+    Las señales fuertes (un formato que no puede ser otra cosa) se buscan en toda la
+    lista antes que la débil (termina en ",XX"): un solo número raro sin separador de
+    miles ("1397,88" en una lista que el resto escribe "1,808.13") no debe imponer su
+    lectura sobre el resto, que si tiene una señal clara."""
+    limpios = [t.replace(" ", "") for t in crudos]
+    for t in limpios:
         if re.fullmatch(r"\d{1,3}(?:,\d{3})+\.\d+", t):       # 2,226.21
             return "."
         if re.fullmatch(r"\d{1,3}(?:\.\d{3})+,\d+", t):       # 2.226,21
             return ","
         if re.fullmatch(r"\d{4,}\.\d+", t) or re.fullmatch(r"\d+\.\d{1,2}", t):
             return "."
+    for t in limpios:
         if re.search(r",\d{1,2}$", t):
             return ","
     return ","
@@ -108,6 +117,12 @@ def separador_decimal(crudos):
 
 def a_numero(t, decimal):
     t = t.replace(" ", "").replace("$", "")
+    # sin ambigüedad posible (un solo separador, dos cifras después): ese separador es
+    # el decimal más allá de qué convención use el resto de la lista. Cubre el caso de
+    # un número mandado sin el separador de miles en una lista que sí lo usa siempre.
+    m = re.fullmatch(r"(\d+)[.,](\d{2})", t)
+    if m:
+        return float(f"{m.group(1)}.{m.group(2)}")
     if decimal == ".":
         t = t.replace(",", "")
     else:
@@ -329,8 +344,10 @@ def renglones_de_texto(lineas, idx=None):
     for l in lineas:
         m = CON_DESCUENTO.match(l)
         if m:
-            desc = PALLET.sub(" ", m.group(2))
-            crudos.append(("neto", l, m.group(1), desc, m.group(5), seccion, None))
+            # sin código interno propio, el código de barras identifica igual al artículo
+            codigo = m["codigo"] or m["barcode"] or ""
+            desc = PALLET.sub(" ", m["desc"])
+            crudos.append(("neto", l, codigo, desc, m["neto"], seccion, None))
             continue
         m = CON_PORCENTAJE.match(l)
         if m:
