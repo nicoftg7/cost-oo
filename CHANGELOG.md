@@ -339,6 +339,23 @@ supplier messages. Three more assumptions about "what an export looks like" turn
 - **A cost exported with a comma decimal ("1.234,50") was read as zero**, which made every
   price change look like a first-time cost. Both regional formats are now read.
 
+## Phase 13 — Getting ready for the first release
+
+Before telling anyone "download it and try it", the install was redone from scratch the way a
+new user's computer would do it — and it failed. Anyone downloading Python today gets 3.14;
+the photo-OCR package had no release for Python 3.13 or newer, and since everything installs
+together, the whole install failed and the app never opened. It had never shown up because the
+developer's machine has an older Python. The fix moved to the OCR package's maintained
+successor (checked that every one of its 41 dependencies installs on Windows with 3.13 and 3.14
+without needing a compiler), added the first test that reads an actual photo of a price list,
+and made CI run on the newest Python as well as the oldest supported one — so the next time a
+dependency drops support for something, CI says so before a user does.
+
+Two smaller launch details: the Windows launchers now keep Windows line endings in GitHub's ZIP
+download (with Linux ones, `cmd.exe` can fail to find the labels its `goto` jumps to), and the
+operator guide now starts with how to download the app at all — including not running it from
+inside the ZIP, where Windows would use a temporary folder and everything it learned would be lost.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

@@ -90,7 +90,9 @@ by themselves. [`tests/test_ejemplo.py`](tests/test_ejemplo.py) walks through th
 
 ## Running it
 
-Windows, for non-technical users: double-click **`Abrir actualizador.bat`**. The first run
+Windows, for non-technical users: **Code → Download ZIP**, extract it (not run from inside the
+ZIP), and double-click **`Abrir actualizador.bat`**. Needs Python 3.11 or newer; CI runs the
+suite on 3.11 and 3.14. The first run
 creates a virtual environment and installs the dependencies, then the app opens in the browser
 with a short setup (business name, suppliers, optional Google Sheet). The operator guide is
 [`LEEME - como usar.md`](LEEME%20-%20como%20usar.md) (Spanish).

@@ -4,6 +4,16 @@ Los proveedores mandan precios por WhatsApp, planillas o listas. Esta app los le
 cada producto en Odoo y arma un archivo para importar los costos nuevos. **Solo toca el costo**:
 nunca el precio de venta, el stock ni la publicación.
 
+## Descargarla
+
+1. Entrá a https://github.com/nicoftg7/costos-odoo, tocá el botón verde **Code** y después
+   **Download ZIP**.
+2. En la carpeta de Descargas, clic derecho sobre el ZIP → **Extraer todo**, y elegí dónde
+   dejar la carpeta (por ejemplo, en Documentos). **No abras la app desde adentro del ZIP**:
+   Windows la correría desde una carpeta temporal y se perdería todo lo que aprende.
+
+Funciona en Windows con Python 3.11 o más nuevo (la última versión de python.org sirve).
+
 ## Para probarla sin tocar nada real
 
 Doble clic en **Probar con el ejemplo**: abre la app con un almacén inventado (otra carpeta de
