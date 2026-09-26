@@ -184,7 +184,7 @@ def _datos_producto(fila):
 
 
 def _opciones(cands):
-    return [{"referencia": c.referencia, "nombre": c.nombre_completo,
+    return [{"referencia": c.referencia, "nombre": c.nombre_completo, "codigo_odoo": c.default_code,
              "costo_actual": float(c.costo_actual), "score": round(s)} for c, s in cands]
 
 
@@ -241,6 +241,10 @@ def analizar_renglon(f, ctx, umbral_auto=UMBRAL_AUTO, umbral_dudoso=UMBRAL_DUDOS
         if cands:
             fila, score = cands[0]
             via = f"nombre ({prov})" if prov else "nombre (sin proveedor)"
+            # variantes con el mismo nombre (talles, colores): el nombre no alcanza para
+            # saber cuál es, así que nunca entra sola
+            if len(cands) > 1 and cands[1][0].clave == fila.clave:
+                score = min(score, umbral_auto - 1)
             f["alternativas"] = " | ".join(f"{c.referencia}={c.nombre_completo} ({s:.0f})"
                                            for c, s in cands[1:])
 

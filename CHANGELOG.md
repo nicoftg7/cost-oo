@@ -324,6 +324,21 @@ matter live in the gap between the data you imagine and the data people actually
 fixes were all tested the way the bug was found this time — by driving a real browser, click
 by click, with and without internal references — not just by calling the code directly.
 
+## Phase 12 — Odoo exports that don't look like the one this was built on
+
+A second round of hand-testing, this time varying the Odoo export itself rather than the
+supplier messages. Three more assumptions about "what an export looks like" turned out wrong:
+
+- **Product variants were silently merged.** A clothing store exports sizes as variants that
+  share one name and differ only in their internal reference. The catalog de-duplicated by
+  name, so three sizes became one — and a new cost for size M would have been written to
+  size S's record. Variants are now kept, shown with their reference on the confirmation
+  screen, and never matched automatically by name alone, since the name can't tell them apart.
+- **An export without the cost column was rejected**, even though the import file only needs
+  the *new* cost. It's now accepted; everything shows up as "had no cost" and gets confirmed.
+- **A cost exported with a comma decimal ("1.234,50") was read as zero**, which made every
+  price change look like a first-time cost. Both regional formats are now read.
+
 ## Roadmap
 
 - **v2:** an Odoo XML-RPC adapter to read the catalog and write costs directly (the

@@ -17,7 +17,7 @@
   {% for o in t.opciones %}
   <label class="opcion">
     <input type="radio" name="elegido" value="{{ o.referencia }}" {% if loop.first and t.alerta != 'sin match' %}checked{% endif %}>
-    <span><b>{{ o.nombre }}</b><br>
+    <span><b>{{ o.nombre }}</b>{% if o.codigo_odoo %} <span class="gris">· {{ o.codigo_odoo }}</span>{% endif %}<br>
       <span class="costos">Costo en Odoo: {{ o.costo_actual|pesos or 'sin costo' }} · Precio {{ 'de la lista' if t.es_lista == true else 'del mensaje' }}: {{ t.costo_nuevo|pesos }}</span></span>
   </label>
   {% endfor %}
@@ -39,7 +39,7 @@
 {% endmacro %}
 
 {% macro cambio_costo(t) %}
-  <div><b>{{ t.nombre_odoo }}</b></div>
+  <div><b>{{ t.nombre_odoo }}</b>{% if t.default_code|vacio %} <span class="gris">· {{ t.default_code }}</span>{% endif %}</div>
   <div class="cambio">{{ t.costo_actual|pesos or 'sin costo' }} <span class="flecha">→</span> <b>{{ t.costo_nuevo|pesos }}</b> {{ variacion(t['variacion_%']) }}</div>
   {% if t.precio_lista|vacio %}<div class="gris">Lista sin impuestos {{ t.precio_lista|pesos }} + impuestos.</div>{% endif %}
   {% if t.precio_por_kilo|vacio %}<div class="gris">Cotiza {{ t.precio_por_kilo|pesos }} el kilo.</div>{% endif %}

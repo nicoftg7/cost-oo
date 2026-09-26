@@ -31,6 +31,17 @@ COLUMNAS = ["id_externo", "referencia", "default_code", "nombre_completo", "prod
             "stock", "publicado", "marcas", "clave", "clave_prov"]
 
 
+def a_numero(v):
+    """Un costo como texto: "1234.5", "1.234,50" o "1,234.50" (según la configuración
+    regional de quien exportó). Lo que no se entiende queda como está (y cuenta como 0)."""
+    t = str(v).strip().replace("$", "").replace(" ", "")
+    if "," in t and "." in t:
+        t = t.replace(".", "").replace(",", ".") if t.rfind(",") > t.rfind(".") else t.replace(",", "")
+    elif "," in t:
+        t = t.replace(",", ".") if re.fullmatch(r"-?\d+,\d{1,2}", t) else t.replace(",", "")
+    return t
+
+
 def partir(nombre):
     """'Yerba 1 kg - Andresito - Andresito' -> ('Yerba 1 kg', 'Andresito')"""
     if " - " in nombre:
@@ -94,9 +105,8 @@ def construir(fuente, quitar_repetidos=True, no_son_productos=()):
         raise ErrorDeDatos("El export de Odoo no tiene la columna del nombre del producto "
                            "(\"name\"). Agregala al exportar.")
     c_cost = col("standard_price", "costo")
-    if c_cost is None:
-        raise ErrorDeDatos("El export de Odoo no tiene la columna de costo "
-                           "(\"standard_price\"). Agregala al exportar.")
+    # sin la columna de costo se puede seguir: todo queda como "no tenía costo cargado" y se
+    # confirma a mano. El archivo para Odoo lleva el costo nuevo, no necesita el viejo.
     c_ref = col("default_code", "referencia interna")
     c_pv = col("list_price", "precio de venta")
     c_web = col("website_id", "sitio web")
@@ -116,7 +126,7 @@ def construir(fuente, quitar_repetidos=True, no_son_productos=()):
         df["etiquetas"] = tags.reindex(df["_grp"]).values
 
     texto = lambda c: df[c].fillna("").astype(str).str.strip() if c else ""
-    numero = lambda c: pd.to_numeric(df[c], errors="coerce").fillna(0.0) if c else 0.0
+    numero = lambda c: pd.to_numeric(df[c].map(a_numero), errors="coerce").fillna(0.0) if c else 0.0
 
     df["nombre_completo"] = df[c_nom].astype(str).str.strip()
     df = df[~df["nombre_completo"].str.match(NO_PRODUCTO)]
@@ -154,7 +164,9 @@ def construir(fuente, quitar_repetidos=True, no_son_productos=()):
 
     out = df[COLUMNAS]
     if quitar_repetidos:
-        out = out.drop_duplicates("nombre_completo")
+        # variantes (talles, colores) comparten el nombre pero no la Referencia interna: son
+        # productos distintos. Quitarlas por nombre mandaba el costo de un talle a otro.
+        out = out.drop_duplicates(["nombre_completo", "default_code"])
     out = out.reset_index(drop=True)
     out["etiquetas"] = out["etiquetas"].fillna("")
     return out

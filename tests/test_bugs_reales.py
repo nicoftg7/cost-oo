@@ -274,3 +274,29 @@ def test_precio_pegado_al_producto_sin_espacio(ciclo):
     filas = res["analisis"]
     assert len(filas) == 2
     assert dict(zip(filas["descripcion"], filas["costo_nuevo"])) == {"aceite": 2500.0, "harina": 2000.0}
+
+
+def test_variantes_con_el_mismo_nombre_no_se_pierden_ni_entran_solas(ciclo):
+    """Talles o colores exportados como variantes comparten el nombre y difieren en la
+    Referencia interna. Se quitaban por nombre repetido: quedaba una sola, y el costo del
+    talle M iba al ID del talle S. Ahora quedan todas y, como el nombre no alcanza para
+    distinguirlas, se pregunta cuál es."""
+    from core.memory import Memoria
+    import tempfile
+    from core.cycle import correr
+    df = export_df([("REM-S", "Remera algodón", 5000), ("REM-M", "Remera algodón", 5000),
+                    ("REM-L", "Remera algodón", 5200)])
+    cat = construir(df)
+    assert list(cat.referencia) == ["REM-S", "REM-M", "REM-L"]
+    res = correr(cat, Memoria(tempfile.mkdtemp()), "Textil Sur\nremera algodon 5500")
+    assert res["listos"].empty and len(res["confirmar"]) == 1
+
+
+def test_export_sin_costo_y_con_costo_en_formato_local():
+    """Sin la columna de costo el export se rechazaba, aunque el archivo para Odoo no la
+    necesita: ahora todo queda "sin costo cargado" y se confirma. Y un costo exportado con
+    coma decimal ("1.234,50") se leía como 0."""
+    df = pd.DataFrame({"id": ["m.a_1", "m.a_2"], "name": ["Harina 1 kg", "Aceite 900 ml"]})
+    assert list(construir(df).costo_actual) == [0.0, 0.0]
+    df["standard_price"] = ["1.234,50", "980,5"]
+    assert list(construir(df).costo_actual) == [1234.5, 980.5]
